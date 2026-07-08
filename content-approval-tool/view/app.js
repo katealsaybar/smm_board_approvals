@@ -171,7 +171,7 @@ const authPanel = document.getElementById('authPanel');
 function renderAuthPanel(){
   const needsPick = !currentReviewer;
   authPanel.innerHTML = `
-    ${needsPick ? '<span class="pick-name-nudge">👆 Pick your name!</span>' : ''}
+    ${needsPick ? '<span class="pick-name-nudge">👆 Pick your name first — or your comments/approvals won\'t save!</span>' : ''}
     <select id="reviewerSelect" class="${needsPick ? 'needs-pick' : ''}">
       <option value="">Who are you?</option>
       ${REVIEWERS.map(r => `<option value="${r}" ${r === currentReviewer ? 'selected' : ''}>${r}</option>`).join('')}
@@ -469,6 +469,7 @@ function renderItemDetailBody(item){
       ${renderSmmNotesBox(rev)}
       ${renderThread(rev)}
       <div class="review-actions">
+        <div class="feedback-hint">💬 Type your feedback here, then tap <b>Approve</b> or <b>Request Revision</b> below to save it.</div>
         <textarea placeholder="Add a comment (optional for approve, encouraged for revision)..."></textarea>
         <div class="btn-row">
           <button class="btn btn-approve" onclick="handleDecision('${item.id}','approved',this)">✅ Approve</button>

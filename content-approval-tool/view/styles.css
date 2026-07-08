@@ -421,6 +421,12 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 .thread-time{color:var(--dim);font-size:10px;margin-left:6px;}
 
 .review-actions{display:flex;flex-direction:column;gap:8px;}
+.feedback-hint{
+  font-size:11px;color:var(--muted);line-height:1.4;
+  background:rgba(196,181,253,0.08);border:1px solid rgba(196,181,253,0.2);
+  border-radius:8px;padding:6px 10px;
+}
+.feedback-hint b{color:var(--lavender);}
 .review-actions textarea{width:100%;min-height:44px;resize:vertical;font-size:12.5px;}
 .review-actions .btn-row{display:flex;gap:8px;}
 .review-actions .btn-row .btn{flex:1;}
