@@ -85,6 +85,22 @@ select:focus, input:focus, textarea:focus{outline:2px solid var(--purple);}
 .auth-panel .signed-in-as{color:var(--muted);}
 .auth-panel .signed-in-as b{color:var(--white);}
 
+/* Impossible-to-miss nudge until a reviewer name is actually picked */
+.pick-name-nudge{
+  color:var(--gold);font-weight:800;font-size:13px;white-space:nowrap;
+  animation:nudge-bounce 1s ease-in-out infinite;
+}
+select.needs-pick{
+  background:var(--gold);color:var(--ink);font-weight:800;
+  border:2px solid var(--gold);
+  animation:nudge-glow 1.2s ease-in-out infinite;
+}
+@keyframes nudge-bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+@keyframes nudge-glow{
+  0%,100%{box-shadow:0 0 0 0 rgba(249,195,75,0.6);}
+  50%{box-shadow:0 0 0 6px rgba(249,195,75,0);}
+}
+
 .auth-gate{
   min-height:100vh;
   display:flex;

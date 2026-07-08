@@ -169,13 +169,17 @@ const appShell = document.getElementById('appShell');
 const authPanel = document.getElementById('authPanel');
 
 function renderAuthPanel(){
-  authPanel.innerHTML = `<select id="reviewerSelect">
-    <option value="">Who are you?</option>
-    ${REVIEWERS.map(r => `<option value="${r}" ${r === currentReviewer ? 'selected' : ''}>${r}</option>`).join('')}
-  </select>`;
+  const needsPick = !currentReviewer;
+  authPanel.innerHTML = `
+    ${needsPick ? '<span class="pick-name-nudge">👆 Pick your name!</span>' : ''}
+    <select id="reviewerSelect" class="${needsPick ? 'needs-pick' : ''}">
+      <option value="">Who are you?</option>
+      ${REVIEWERS.map(r => `<option value="${r}" ${r === currentReviewer ? 'selected' : ''}>${r}</option>`).join('')}
+    </select>`;
   document.getElementById('reviewerSelect').addEventListener('change', (e)=>{
     currentReviewer = e.target.value;
     localStorage.setItem('trs_reviewer', currentReviewer);
+    renderAuthPanel();
     render();
   });
 }
@@ -711,7 +715,11 @@ async function deleteBatch(batchId, event){
 
 async function handleDecision(itemId, decision, btn){
   const reviewer = getReviewer();
-  if (!reviewer) return;
+  if (!reviewer){
+    alert('Pick your name from the dropdown at the top first! 👆');
+    document.getElementById('reviewerSelect')?.focus();
+    return;
+  }
   const item = findItem(itemId);
   const rev = latestRevision(item);
   const textarea = btn.closest('.review-actions').querySelector('textarea');
