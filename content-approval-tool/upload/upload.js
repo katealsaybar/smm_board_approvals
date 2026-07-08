@@ -2,11 +2,8 @@
 const SUPABASE_URL = 'https://qyojrknmgwkfjrdhtxhk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rsz9t8fPuF_leH5KwRUeKA__ZiwO9CP';
 
-/* Jules: get these two from Cloudinary → Settings → Upload → Upload presets →
-   Add upload preset → set "Signing Mode" to Unsigned → save, then copy the
-   cloud name (top of any Cloudinary dashboard page) and the preset name here. */
-const CLOUDINARY_CLOUD_NAME = null; // e.g. "tararose"
-const CLOUDINARY_UPLOAD_PRESET = null; // e.g. "trs_unsigned"
+const CLOUDINARY_CLOUD_NAME = 'dj7chrw4z';
+const CLOUDINARY_UPLOAD_PRESET = 'b0pb9erf';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
