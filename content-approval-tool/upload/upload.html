@@ -24,35 +24,51 @@
   </div>
 
   <div class="field">
-    <label for="batchSelect">Batch</label>
-    <select id="batchSelect"></select>
-    <div class="new-batch-row" id="newBatchRow" style="display:none;">
-      <input type="text" id="newBatchName" placeholder="New batch name, e.g. Batch 5 — August Reels">
-      <button class="btn btn-ghost" id="newBatchCancel">Cancel</button>
-    </div>
-    <div class="hint">Pick an existing batch, or choose "+ Create new batch" at the bottom of the list.</div>
+    <label for="modeSelect">What are you uploading?</label>
+    <select id="modeSelect">
+      <option value="new">New content</option>
+      <option value="revision">A fix for something flagged "needs revision"</option>
+    </select>
   </div>
 
-  <div class="row">
+  <div id="newContentFields">
     <div class="field">
-      <label for="categorySelect">Category</label>
-      <select id="categorySelect">
-        <option value="transformation">Transformation</option>
-        <option value="education">Education</option>
-        <option value="bts">BTS & Culture</option>
-        <option value="clientstories">Client Stories</option>
-        <option value="foundersvoice">Founder's Voice</option>
-      </select>
+      <label for="batchSelect">Batch</label>
+      <select id="batchSelect"></select>
+      <div class="new-batch-row" id="newBatchRow" style="display:none;">
+        <input type="text" id="newBatchName" placeholder="New batch name, e.g. Batch 5 — August Reels">
+        <button class="btn btn-ghost" id="newBatchCancel">Cancel</button>
+      </div>
+      <div class="hint">Pick an existing batch, or choose "+ Create new batch" at the bottom of the list.</div>
     </div>
-    <div class="field">
-      <label for="formatSelect">Format</label>
-      <select id="formatSelect">
-        <option value="reel">IG Reel</option>
-        <option value="story">IG Story</option>
-        <option value="carousel">IG Carousel</option>
-        <option value="static">IG Static Post</option>
-      </select>
+
+    <div class="row">
+      <div class="field">
+        <label for="categorySelect">Category</label>
+        <select id="categorySelect">
+          <option value="transformation">Transformation</option>
+          <option value="education">Education</option>
+          <option value="bts">BTS & Culture</option>
+          <option value="clientstories">Client Stories</option>
+          <option value="foundersvoice">Founder's Voice</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="formatSelect">Format</label>
+        <select id="formatSelect">
+          <option value="reel">IG Reel</option>
+          <option value="story">IG Story</option>
+          <option value="carousel">IG Carousel</option>
+          <option value="static">IG Static Post</option>
+        </select>
+      </div>
     </div>
+  </div>
+
+  <div class="field" id="revisionTargetField" style="display:none;">
+    <label for="revisionSelect">Which content needs this fix?</label>
+    <select id="revisionSelect"></select>
+    <div class="hint">Only items currently marked "needs revision" show here. This adds a new version to that same card — reviewers will see it as v2 (or later) alongside the original feedback, not as a separate item.</div>
   </div>
 
   <div class="field">
@@ -60,10 +76,17 @@
     <textarea id="captionInput" placeholder="Write the caption as it will appear on IG..."></textarea>
   </div>
 
-  <div class="field">
-    <label for="fileInput">Media file(s) (photo or video)</label>
-    <input type="file" id="fileInput" accept="image/*,video/*" multiple>
-    <div class="hint">For a Carousel, select multiple files — order selected = slide order. Each file uploads to Cloudinary automatically.</div>
+  <div class="field" id="singleFileField">
+    <label for="fileInput">Media file (photo or video)</label>
+    <input type="file" id="fileInput" accept="image/*,video/*">
+    <div class="hint">Uploads to Cloudinary automatically.</div>
+  </div>
+
+  <div class="field" id="carouselField" style="display:none;">
+    <label>Carousel slides</label>
+    <div class="hint">Upload each slide into its box, in the order they should appear. Need more than 4? Add another slot below.</div>
+    <div class="carousel-grid" id="carouselGrid"></div>
+    <button type="button" class="btn btn-ghost" id="addSlideBtn">+ Add another slide</button>
   </div>
 
   <button class="btn btn-primary" id="submitBtn">Upload & add for review</button>
