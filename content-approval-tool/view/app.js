@@ -1,8 +1,8 @@
 /* ===================== CONFIG ===================== */
 const SUPABASE_URL = 'https://qyojrknmgwkfjrdhtxhk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rsz9t8fPuF_leH5KwRUeKA__ZiwO9CP';
-const CLOUDINARY_CLOUD_NAME = null; // e.g. "tararose" — Jules's upload.html is where this actually gets used
-const CLOUDINARY_UPLOAD_PRESET = null; // unsigned upload preset name
+const CLOUDINARY_CLOUD_NAME = 'dj7chrw4z'; // same account ../upload/upload.html uses
+const CLOUDINARY_UPLOAD_PRESET = 'b0pb9erf'; // unsigned upload preset name
 const GROQ_API_KEY = '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'; // enables voice-note transcription
 const GROQ_MODEL = 'whisper-large-v3-turbo';
 /* NOTE on GROQ_API_KEY: this is a static page with no backend, so calling Groq
@@ -738,6 +738,23 @@ function populateModalBatchSelect(){
   sel.innerHTML = state.batches.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 }
 
+async function uploadToCloudinary(file){
+  const resourceType = file.type.startsWith('video') ? 'video' : 'image';
+  const form = new FormData();
+  form.append('file', file);
+  form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, {
+    method: 'POST',
+    body: form
+  });
+  if (!res.ok){
+    const errBody = await res.text().catch(()=> '');
+    throw new Error(`Cloudinary upload failed (${res.status}): ${errBody.slice(0,200)}`);
+  }
+  const data = await res.json();
+  return { type: resourceType, url: data.secure_url };
+}
+
 document.getElementById('modalSubmit').onclick = async ()=>{
   const batchId = document.getElementById('modalBatch').value;
   const category = document.getElementById('modalCategory').value;
@@ -745,40 +762,58 @@ document.getElementById('modalSubmit').onclick = async ()=>{
   const caption = document.getElementById('modalCaption').value.trim();
   const files = Array.from(document.getElementById('modalFile').files);
   if (!batchId || !files.length) { alert('Pick a batch and at least one media file.'); return; }
-  // NOTE: URL.createObjectURL() below is a browser-local blob URL — it only works
-  // in the tab that created it. Fine for solo dry-run testing, but other reviewers
-  // won't see the media this way — use Jules's ../upload/upload.html instead, which
-  // uploads to Cloudinary first and stores a real shareable URL.
 
-  let mediaType, mediaUrl = null, media = null;
-  if (format === 'carousel' && files.length > 1){
-    mediaType = 'carousel';
-    media = files.map(f => ({
-      type: f.type.startsWith('video') ? 'video' : 'image',
-      url: URL.createObjectURL(f)
-    }));
-  } else {
-    const file = files[0];
-    mediaType = file.type.startsWith('video') ? 'video' : 'image';
-    mediaUrl = URL.createObjectURL(file);
+  const submitBtn = document.getElementById('modalSubmit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Uploading...';
+  try{
+    let mediaType, mediaUrl = null, media = null;
+    if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET){
+      // Real upload — every reviewer sees this, not just this browser tab.
+      if (format === 'carousel' && files.length > 1){
+        mediaType = 'carousel';
+        media = [];
+        for (const f of files) media.push(await uploadToCloudinary(f));
+      } else {
+        const uploaded = await uploadToCloudinary(files[0]);
+        mediaType = uploaded.type;
+        mediaUrl = uploaded.url;
+      }
+    } else {
+      // Fallback only if Cloudinary isn't configured — local-tab-only preview.
+      if (format === 'carousel' && files.length > 1){
+        mediaType = 'carousel';
+        media = files.map(f => ({ type: f.type.startsWith('video') ? 'video' : 'image', url: URL.createObjectURL(f) }));
+      } else {
+        const file = files[0];
+        mediaType = file.type.startsWith('video') ? 'video' : 'image';
+        mediaUrl = URL.createObjectURL(file);
+      }
+    }
+
+    if (sb){
+      const { data: item } = await sb.from('content_items').insert({ batch_id: batchId, category, format }).select().single();
+      await sb.from('revisions').insert({ content_item_id: item.id, revision_number: 1, media_type: mediaType, media_url: mediaUrl, media, caption });
+      await refreshState();
+    } else {
+      const batch = state.batches.find(b=>b.id===batchId);
+      const revision = mediaType === 'carousel'
+        ? { revisionNumber:1, mediaType, media, caption, reviews: [] }
+        : { revisionNumber:1, mediaType, mediaUrl, caption, reviews: [] };
+      batch.items.push({ id: 'item-' + Date.now(), category, format, revisions: [revision] });
+    }
+
+    document.getElementById('modalCaption').value = '';
+    document.getElementById('modalFile').value = '';
+    addModal.classList.remove('open');
+    render();
+  }catch(err){
+    console.error(err);
+    alert(err.message || 'Upload failed.');
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Add for review';
   }
-
-  if (sb){
-    const { data: item } = await sb.from('content_items').insert({ batch_id: batchId, category, format }).select().single();
-    await sb.from('revisions').insert({ content_item_id: item.id, revision_number: 1, media_type: mediaType, media_url: mediaUrl, media, caption });
-    await refreshState();
-  } else {
-    const batch = state.batches.find(b=>b.id===batchId);
-    const revision = mediaType === 'carousel'
-      ? { revisionNumber:1, mediaType, media, caption, reviews: [] }
-      : { revisionNumber:1, mediaType, mediaUrl, caption, reviews: [] };
-    batch.items.push({ id: 'item-' + Date.now(), category, format, revisions: [revision] });
-  }
-
-  document.getElementById('modalCaption').value = '';
-  document.getElementById('modalFile').value = '';
-  addModal.classList.remove('open');
-  render();
 };
 
 async function init(){
