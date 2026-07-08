@@ -476,7 +476,7 @@ function renderItemDetailBody(item){
         <div class="btn-row">
           <button class="btn btn-approve" onclick="handleDecision('${item.id}','approved',this)">✅ Approve</button>
           <button class="btn btn-revision" onclick="handleDecision('${item.id}','revision',this)">❌ Request Revision</button>
-          <button class="btn btn-record" id="rec-btn-${item.id}" onclick="toggleRecording('${item.id}', this)" title="Record a voice note">🎙️</button>
+          <button class="btn btn-record" id="rec-btn-${item.id}" onclick="toggleRecording('${item.id}', this)" title="Record a voice note">🎙️ Voice note</button>
         </div>
         <div class="voice-pending" id="voice-pending-${item.id}"></div>
       </div>
@@ -778,14 +778,14 @@ async function toggleRecording(itemId, btn){
     stream.getTracks().forEach(t=>t.stop());
     const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
     activeRecorder = null;
-    btn.textContent = '🎙️';
+    btn.textContent = '🎙️ Voice note';
     btn.classList.remove('recording');
     handleVoiceNoteRecorded(itemId, blob);
   };
 
   activeRecorder = { itemId, mediaRecorder, stream };
   mediaRecorder.start();
-  btn.textContent = '⏹';
+  btn.textContent = '⏹ Stop recording';
   btn.classList.add('recording');
 }
 
