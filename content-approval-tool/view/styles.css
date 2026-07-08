@@ -259,6 +259,16 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 .ig-username{font-size:13px;font-weight:600;}
 .ig-post-header .dots{margin-left:auto;color:#000;font-weight:700;}
 .ig-media{width:100%;aspect-ratio:1/1;object-fit:cover;background:#111;display:block;}
+
+/* Videos autoplay muted (browser requirement) — this lets reviewers tap to hear audio */
+.video-wrap{position:relative;display:block;width:100%;height:100%;}
+.video-wrap video{cursor:pointer;}
+.mute-hint{
+  position:absolute;bottom:8px;right:8px;z-index:5;
+  background:rgba(0,0,0,0.65);color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:0.3px;
+  padding:4px 9px;border-radius:20px;cursor:pointer;
+}
 .ig-icons-row{display:flex;align-items:center;gap:14px;padding:8px 10px 2px;font-size:19px;}
 .ig-icons-row .spacer{flex:1;}
 .ig-likes{padding:2px 10px 0;font-size:12.5px;font-weight:700;}

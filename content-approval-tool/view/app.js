@@ -267,9 +267,15 @@ function captionBadge(item){
   return captionChanged(item) ? ' <span class="updated-pill inline">Edited</span>' : '';
 }
 
+// Autoplay requires muted, so every review preview starts silent like a real IG
+// Reel/Story would — tap the video to unmute and actually hear it before approving.
+function videoTag(url, cls=''){
+  return `<span class="video-wrap"><video class="${cls}" src="${url}" muted loop autoplay playsinline onclick="this.muted=!this.muted"></video><span class="mute-hint" onclick="this.previousElementSibling.muted=!this.previousElementSibling.muted">🔇 Tap for sound</span></span>`;
+}
+
 function renderIgMock(item, rev, format){
   const mediaTag = rev.mediaType === 'video'
-    ? `<video src="${rev.mediaUrl}" muted loop autoplay playsinline></video>`
+    ? videoTag(rev.mediaUrl)
     : `<img src="${rev.mediaUrl}" alt="">`;
 
   if (format === 'carousel'){
@@ -279,7 +285,7 @@ function renderIgMock(item, rev, format){
     const changed = changedSlideIndices(item);
     const isChangedSlide = changed.has(idx);
     const slideTag = current.type === 'video'
-      ? `<video class="ig-media" src="${current.url}" muted loop autoplay playsinline></video>`
+      ? videoTag(current.url, 'ig-media')
       : `<img class="ig-media" src="${current.url}" alt="">`;
     const dots = mediaList.map((_,i)=>`<span class="ig-carousel-dot ${i===idx?'active':''} ${changed.has(i)?'dot-updated':''}"></span>`).join('');
     return `
@@ -345,7 +351,7 @@ function renderIgMock(item, rev, format){
         <span class="ig-username">tararosesalon</span>
         <span class="dots">⋯</span>
       </div>
-      ${mediaTag.replace('<img','<img class="ig-media"').replace('<video','<video class="ig-media"')}
+      ${rev.mediaType === 'video' ? videoTag(rev.mediaUrl, 'ig-media') : `<img class="ig-media" src="${rev.mediaUrl}" alt="">`}
       <div class="ig-icons-row">❤️ 💬 ✈️<span class="spacer"></span>🔖</div>
       <div class="ig-likes">1,284 likes</div>
       <div class="ig-caption"><b>tararosesalon</b>${escapeHtml(rev.caption)}${captionBadge(item)}</div>
@@ -478,7 +484,7 @@ function carouselSlide(itemId, delta){
   if (slideWrap){
     slideWrap.classList.toggle('slide-updated', isChangedSlide);
     const mediaTag = current.type === 'video'
-      ? `<video class="ig-media" src="${current.url}" muted loop autoplay playsinline></video>`
+      ? videoTag(current.url, 'ig-media')
       : `<img class="ig-media" src="${current.url}" alt="">`;
     slideWrap.innerHTML = (isChangedSlide ? '<span class="updated-pill">Updated</span>' : '') + mediaTag;
   }
