@@ -59,49 +59,32 @@ function clearStatus(){
   statusBox.textContent = '';
 }
 
-/* ===================== AUTH (Google Sign-In) ===================== */
-let currentSession = null;
+/* ===================== AUTH (temporarily open — manual picker) =====================
+   Google Sign-In is paused per Tara's call to consolidate on Metricool instead of a
+   custom approval system. Reviewer identity is a plain local picker until then. */
+const REVIEWER_NAMES = Object.values(ALLOWED_REVIEWERS);
+let currentReviewer = localStorage.getItem('trs_reviewer') || '';
 
 const authGate = document.getElementById('authGate');
 const appShell = document.getElementById('appShell');
-const authGateError = document.getElementById('authGateError');
 const authPanel = document.getElementById('authPanel');
 
-document.getElementById('googleSignInBtn').addEventListener('click', async ()=>{
-  await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
-});
-
 function renderAuthPanel(){
-  const email = currentSession?.user?.email;
-  const name = email ? ALLOWED_REVIEWERS[email] : null;
-  authPanel.innerHTML = name
-    ? `<span class="signed-in-as">Signed in as <b>${name}</b></span><button class="btn btn-ghost" id="signOutBtn">Sign out</button>`
-    : '';
-  const signOutBtn = document.getElementById('signOutBtn');
-  if (signOutBtn) signOutBtn.addEventListener('click', ()=> sb.auth.signOut());
+  authPanel.innerHTML = `<select id="reviewerSelect">
+    <option value="">Who are you?</option>
+    ${REVIEWER_NAMES.map(r => `<option value="${r}" ${r === currentReviewer ? 'selected' : ''}>${r}</option>`).join('')}
+  </select>`;
+  document.getElementById('reviewerSelect').addEventListener('change', (e)=>{
+    currentReviewer = e.target.value;
+    localStorage.setItem('trs_reviewer', currentReviewer);
+  });
 }
 
 async function refreshAuthGate(){
-  const { data } = await sb.auth.getSession();
-  currentSession = data.session;
-  const email = currentSession?.user?.email;
-
-  if (currentSession && !ALLOWED_REVIEWERS[email]){
-    authGateError.style.display = 'block';
-    authGateError.textContent = `${email} isn't on the approved list for this tool. Signing you out.`;
-    await sb.auth.signOut();
-    currentSession = null;
-  }
-
-  if (currentSession && ALLOWED_REVIEWERS[currentSession.user.email]){
-    authGate.style.display = 'none';
-    appShell.style.display = '';
-    renderAuthPanel();
-    return true;
-  }
-  authGate.style.display = 'flex';
-  appShell.style.display = 'none';
-  return false;
+  authGate.style.display = 'none';
+  appShell.style.display = '';
+  renderAuthPanel();
+  return true;
 }
 
 /* ===================== BATCH LIST ===================== */
@@ -468,8 +451,3 @@ async function init(){
 (async function boot(){
   if (await refreshAuthGate()) await init();
 })();
-
-sb.auth.onAuthStateChange(async (_event, session)=>{
-  currentSession = session;
-  if (await refreshAuthGate()) await init();
-});

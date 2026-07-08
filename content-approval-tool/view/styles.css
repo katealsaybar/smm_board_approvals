@@ -49,6 +49,7 @@ header{
 .brand{
   display:flex;
   flex-direction:column;
+  align-items:flex-start;
   gap:2px;
 }
 .brand-logo{height:30px;width:auto;display:block;}
