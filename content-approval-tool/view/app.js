@@ -279,10 +279,11 @@ function toWebVideoUrl(url){
 }
 
 // Autoplay requires muted, so every review preview starts silent like a real IG
-// Reel/Story would — tap the video to unmute and actually hear it before approving.
+// Reel/Story would. Native controls give play/pause, seek, and unmute in one
+// standard bar instead of a custom tap-to-unmute hint.
 function videoTag(url, cls=''){
   url = toWebVideoUrl(url);
-  return `<span class="video-wrap"><video class="${cls}" src="${url}" muted loop autoplay playsinline onclick="this.muted=!this.muted"></video><span class="mute-hint" onclick="this.previousElementSibling.muted=!this.previousElementSibling.muted">🔇 Tap for sound</span></span>`;
+  return `<video class="${cls}" src="${url}" muted loop autoplay playsinline controls></video>`;
 }
 
 function renderIgMock(item, rev, format){
