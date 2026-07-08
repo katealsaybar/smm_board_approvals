@@ -286,7 +286,7 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 .ig-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#feda75,#d62976,#4f5bd5);flex-shrink:0;}
 .ig-username{font-size:13px;font-weight:600;}
 .ig-post-header .dots{margin-left:auto;color:#000;font-weight:700;}
-.ig-media{width:100%;aspect-ratio:1/1;object-fit:cover;background:#111;display:block;}
+.ig-media{width:100%;aspect-ratio:4/5;object-fit:cover;background:#111;display:block;}
 
 .ig-icons-row{display:flex;align-items:center;gap:14px;padding:8px 10px 2px;font-size:19px;}
 .ig-icons-row .spacer{flex:1;}
@@ -306,7 +306,7 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 .ig-post.ig-dark .ig-viewcomments{color:#a8a8a8;}
 
 /* Carousel */
-.ig-carousel-media{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;background:#111;}
+.ig-carousel-media{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#111;}
 .ig-carousel-media .ig-media{width:100%;height:100%;}
 .ig-carousel-arrow{
   position:absolute;top:50%;transform:translateY(-50%);

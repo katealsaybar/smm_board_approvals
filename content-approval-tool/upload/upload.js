@@ -27,6 +27,7 @@ const newBatchName = document.getElementById('newBatchName');
 const newBatchCancel = document.getElementById('newBatchCancel');
 const categorySelect = document.getElementById('categorySelect');
 const formatSelect = document.getElementById('formatSelect');
+const ratioHint = document.getElementById('ratioHint');
 const captionInput = document.getElementById('captionInput');
 const fileInput = document.getElementById('fileInput');
 const singleFileField = document.getElementById('singleFileField');
@@ -279,6 +280,15 @@ addSlideBtn.addEventListener('click', ()=>{
   }
 });
 
+// Matches the aspect-ratio the review tool actually displays each format at —
+// upload the wrong ratio and it'll crop weirdly in review (ask Jules).
+const FORMAT_RATIO_HINTS = {
+  reel: 'Best fit: 9:16 (vertical). Anything else gets cropped to fill the frame.',
+  story: 'Best fit: 9:16 (vertical). Anything else gets cropped to fill the frame.',
+  carousel: 'Best fit: 4:5 (portrait). Anything else gets cropped to fill the frame.',
+  static: 'Best fit: 4:5 (portrait). Anything else gets cropped to fill the frame.'
+};
+
 function toggleUploadMode(){
   const format = modeSelect.value === 'revision'
     ? (currentRevisionTarget() ? currentRevisionTarget().format : null)
@@ -291,6 +301,7 @@ function toggleUploadMode(){
     singleFileField.style.display = 'block';
     carouselField.style.display = 'none';
   }
+  ratioHint.textContent = FORMAT_RATIO_HINTS[format] || '';
 }
 formatSelect.addEventListener('change', toggleUploadMode);
 toggleUploadMode();
