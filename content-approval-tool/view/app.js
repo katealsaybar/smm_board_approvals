@@ -267,9 +267,20 @@ function captionBadge(item){
   return captionChanged(item) ? ' <span class="updated-pill inline">Edited</span>' : '';
 }
 
+// Phone-recorded .mov/HEVC files often play audio but show a black frame in
+// Chrome (no decode support) — request Cloudinary's transcoded mp4 instead,
+// which it generates on the fly regardless of the originally uploaded format.
+function toWebVideoUrl(url){
+  if (typeof url === 'string' && url.includes('res.cloudinary.com') && /\.(mov|avi|mkv|wmv)$/i.test(url)){
+    return url.replace(/\.(mov|avi|mkv|wmv)$/i, '.mp4');
+  }
+  return url;
+}
+
 // Autoplay requires muted, so every review preview starts silent like a real IG
 // Reel/Story would — tap the video to unmute and actually hear it before approving.
 function videoTag(url, cls=''){
+  url = toWebVideoUrl(url);
   return `<span class="video-wrap"><video class="${cls}" src="${url}" muted loop autoplay playsinline onclick="this.muted=!this.muted"></video><span class="mute-hint" onclick="this.previousElementSibling.muted=!this.previousElementSibling.muted">🔇 Tap for sound</span></span>`;
 }
 
