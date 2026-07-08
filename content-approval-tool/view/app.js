@@ -173,7 +173,7 @@ const authPanel = document.getElementById('authPanel');
 function renderAuthPanel(){
   const needsPick = !currentReviewer;
   authPanel.innerHTML = `
-    ${needsPick ? '<span class="pick-name-nudge">👆 Pick your name first — or your comments/approvals won\'t save!</span>' : ''}
+    ${needsPick ? '<span class="pick-name-nudge">👆 Pick your name (or it won\'t save)!</span>' : ''}
     <select id="reviewerSelect" class="${needsPick ? 'needs-pick' : ''}">
       <option value="">Who are you?</option>
       ${REVIEWERS.map(r => `<option value="${r}" ${r === currentReviewer ? 'selected' : ''}>${r}</option>`).join('')}
@@ -471,7 +471,7 @@ function renderItemDetailBody(item){
       ${renderSmmNotesBox(rev)}
       ${renderThread(rev)}
       <div class="review-actions">
-        <div class="feedback-hint">💬 Type your feedback here, then tap <b>Approve</b> or <b>Request Revision</b> below to save it.</div>
+        <div class="feedback-hint">💬 Type feedback and/or 🎙️ record a voice note, then tap <b>Approve</b> or <b>Request Revision</b> below — nothing saves until you tap one of those.</div>
         <textarea placeholder="Add a comment (optional for approve, encouraged for revision)..."></textarea>
         <div class="btn-row">
           <button class="btn btn-approve" onclick="handleDecision('${item.id}','approved',this)">✅ Approve</button>
@@ -730,11 +730,16 @@ async function handleDecision(itemId, decision, btn){
   const voiceNotes = (pendingVoiceNotes[itemId] || []).map(n => ({ dataUrl: n.dataUrl, transcript: n.transcript }));
 
   if (sb){
-    await sb.from('reviews').insert({
+    const { error } = await sb.from('reviews').insert({
       revision_id: rev.id,
       reviewer, decision, comment,
       voice_notes: voiceNotes.length ? voiceNotes : null
     });
+    if (error){
+      console.error('Failed to save review', error);
+      alert('That didn\'t save — ' + error.message + '\n\nTry again, and if it keeps happening tell Kate.');
+      return;
+    }
     delete pendingVoiceNotes[itemId];
     await refreshState();
   } else {
