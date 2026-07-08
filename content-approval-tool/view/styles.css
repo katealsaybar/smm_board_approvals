@@ -436,10 +436,16 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 .btn-record.recording{background:var(--coral);animation:rec-pulse 1.2s infinite;}
 @keyframes rec-pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
 
-.voice-pending{display:none;margin-top:2px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;}
-.voice-pending.show{display:block;}
-.voice-pending audio{width:100%;height:32px;display:block;}
-.voice-pending .vp-status{font-size:11px;color:var(--dim);margin-top:4px;}
+.voice-pending{display:none;margin-top:2px;}
+.voice-pending.show{display:flex;flex-direction:column;gap:8px;}
+.voice-pending-item{padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;position:relative;}
+.voice-pending-item audio{width:100%;height:32px;display:block;padding-right:26px;}
+.voice-pending-item .vp-status{font-size:11px;color:var(--dim);margin-top:4px;}
+.voice-pending-remove{
+  position:absolute;top:6px;right:6px;
+  background:rgba(255,155,155,0.15);color:var(--coral);border:none;border-radius:50%;
+  width:18px;height:18px;font-size:11px;line-height:1;cursor:pointer;
+}
 
 .voice-note{margin-top:6px;}
 .voice-note audio{width:100%;height:30px;display:block;}

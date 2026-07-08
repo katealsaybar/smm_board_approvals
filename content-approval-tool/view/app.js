@@ -141,7 +141,9 @@ async function loadState(){
             reviewer: rv.reviewer,
             decision: rv.decision,
             comment: rv.comment,
-            voiceNote: rv.voice_note_url ? { dataUrl: rv.voice_note_url, transcript: rv.voice_note_transcript } : null,
+            // voice_notes (jsonb array) is the current column; voice_note_url is the
+            // older single-note column, read as a fallback for rows saved before this.
+            voiceNotes: rv.voice_notes || (rv.voice_note_url ? [{ dataUrl: rv.voice_note_url, transcript: rv.voice_note_transcript }] : []),
             date: rv.created_at
           }))
         }))
@@ -409,7 +411,7 @@ function renderThread(rev){
       ${r.decision==='approved' ? '✅ approved' : '❌ requested revision'}
       ${r.comment ? ' — ' + escapeHtml(r.comment) : ''}
       <span class="thread-time">${timeAgo(r.date)}</span>
-      ${renderVoiceNote(r.voiceNote)}
+      ${(r.voiceNotes || []).map(renderVoiceNote).join('')}
     </div>`).join('') + `</div>`;
 }
 
@@ -725,28 +727,29 @@ async function handleDecision(itemId, decision, btn){
   const rev = latestRevision(item);
   const textarea = btn.closest('.review-actions').querySelector('textarea');
   const comment = textarea.value.trim();
-  const voiceNote = pendingVoiceNotes[itemId] || null;
+  const voiceNotes = (pendingVoiceNotes[itemId] || []).map(n => ({ dataUrl: n.dataUrl, transcript: n.transcript }));
 
   if (sb){
     await sb.from('reviews').insert({
       revision_id: rev.id,
       reviewer, decision, comment,
-      voice_note_url: voiceNote ? voiceNote.dataUrl : null,
-      voice_note_transcript: voiceNote ? voiceNote.transcript : null
+      voice_notes: voiceNotes.length ? voiceNotes : null
     });
     delete pendingVoiceNotes[itemId];
     await refreshState();
   } else {
-    rev.reviews.push({ reviewer, decision, comment, voiceNote, date: new Date().toISOString() });
+    rev.reviews.push({ reviewer, decision, comment, voiceNotes, date: new Date().toISOString() });
     delete pendingVoiceNotes[itemId];
     saveState();
   }
   render();
 }
 
-/* ===================== VOICE NOTES ===================== */
+/* ===================== VOICE NOTES =====================
+   Tara tends to leave more than one thought before submitting, so recordings
+   stack up as a list instead of the newest one overwriting the last. */
 let activeRecorder = null; // { itemId, mediaRecorder, stream }
-const pendingVoiceNotes = {}; // itemId -> { dataUrl, mimeType, transcript }
+const pendingVoiceNotes = {}; // itemId -> [{ dataUrl, mimeType, transcript, status }]
 
 async function toggleRecording(itemId, btn){
   if (activeRecorder && activeRecorder.itemId === itemId){
@@ -784,27 +787,45 @@ async function toggleRecording(itemId, btn){
 function handleVoiceNoteRecorded(itemId, blob){
   const reader = new FileReader();
   reader.onload = () => {
-    pendingVoiceNotes[itemId] = { dataUrl: reader.result, mimeType: blob.type, transcript: '' };
-    renderPendingVoiceNote(itemId, 'Transcribing…');
-    transcribeVoiceNote(itemId, blob);
+    const note = { dataUrl: reader.result, mimeType: blob.type, transcript: '', status: 'transcribing' };
+    pendingVoiceNotes[itemId] = pendingVoiceNotes[itemId] || [];
+    pendingVoiceNotes[itemId].push(note);
+    renderPendingVoiceNote(itemId);
+    transcribeVoiceNote(itemId, blob, note);
   };
   reader.readAsDataURL(blob);
 }
 
-function renderPendingVoiceNote(itemId, status){
-  const el = document.getElementById(`voice-pending-${itemId}`);
-  if (!el) return;
-  const note = pendingVoiceNotes[itemId];
-  if (!note){ el.classList.remove('show'); el.innerHTML=''; return; }
-  el.classList.add('show');
-  el.innerHTML = `
-    <audio controls src="${note.dataUrl}"></audio>
-    <div class="vp-status">${status || (note.transcript ? '"' + escapeHtml(note.transcript) + '"' : 'No transcript yet.')}</div>`;
+function removePendingVoiceNote(itemId, index){
+  if (!pendingVoiceNotes[itemId]) return;
+  pendingVoiceNotes[itemId].splice(index, 1);
+  renderPendingVoiceNote(itemId);
 }
 
-async function transcribeVoiceNote(itemId, blob){
+function renderPendingVoiceNote(itemId){
+  const el = document.getElementById(`voice-pending-${itemId}`);
+  if (!el) return;
+  const notes = pendingVoiceNotes[itemId] || [];
+  if (!notes.length){ el.classList.remove('show'); el.innerHTML=''; return; }
+  el.classList.add('show');
+  el.innerHTML = notes.map((note, i) => `
+    <div class="voice-pending-item">
+      <audio controls src="${note.dataUrl}"></audio>
+      <button type="button" class="voice-pending-remove" title="Remove this recording" onclick="removePendingVoiceNote('${itemId}', ${i})">✕</button>
+      <div class="vp-status">${
+        note.status === 'transcribing' ? 'Transcribing…'
+        : note.status === 'failed' ? '(transcription failed)'
+        : note.status === 'no-key' ? '(no transcript — add a Groq API key to enable)'
+        : note.transcript ? '"' + escapeHtml(note.transcript) + '"'
+        : 'No transcript yet.'
+      }</div>
+    </div>`).join('');
+}
+
+async function transcribeVoiceNote(itemId, blob, note){
   if (!GROQ_API_KEY){
-    renderPendingVoiceNote(itemId, '(no transcript — add a Groq API key to enable)');
+    note.status = 'no-key';
+    renderPendingVoiceNote(itemId);
     return;
   }
   try{
@@ -818,11 +839,13 @@ async function transcribeVoiceNote(itemId, blob){
     });
     if (!res.ok) throw new Error(`Groq returned ${res.status}`);
     const data = await res.json();
-    if (pendingVoiceNotes[itemId]) pendingVoiceNotes[itemId].transcript = data.text || '';
+    note.transcript = data.text || '';
+    note.status = 'done';
     renderPendingVoiceNote(itemId);
   }catch(err){
     console.error('Groq transcription failed', err);
-    renderPendingVoiceNote(itemId, '(transcription failed — ' + err.message + ')');
+    note.status = 'failed';
+    renderPendingVoiceNote(itemId);
   }
 }
 
