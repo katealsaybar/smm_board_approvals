@@ -461,6 +461,7 @@ function renderItem(item){
         <span class="format-badge">IG ${item.format}</span>
         <span class="rev-badge">v${rev.revisionNumber}</span>
         <span class="status-pill status-${status}">${STATUS_LABELS[status]}</span>
+        <button class="btn-delete" title="Delete this item" onclick="deleteItem('${item.id}', event)">🗑</button>
       </div>
       ${renderItemDetailBody(item)}
     </div>`;
@@ -517,6 +518,7 @@ function renderItemRow(item){
           <div class="item-row-caption">${escapeHtml(rev.caption).slice(0,90)}${rev.caption.length>90?'…':''}</div>
           <div class="verdicts">${verdictChipsHtml(item)}</div>
         </div>
+        <button class="btn-delete" title="Delete this item" onclick="deleteItem('${item.id}', event)">🗑</button>
         <span class="chevron">▾</span>
       </div>
       <div class="item-row-detail">${renderItemDetailBody(item)}</div>
@@ -572,6 +574,7 @@ function renderBatch(batch){
           <span><b>${p.approved}</b> approved</span>
           <span><b>${p.revision}</b> needs revision</span>
           <span><b>${p.pending}</b> pending</span>
+          <button class="btn-delete" title="Delete this whole batch" onclick="deleteBatch('${batch.id}', event)">🗑</button>
           <span class="chevron">▾</span>
         </div>
       </div>
@@ -604,6 +607,30 @@ function findItem(id){
     if (item) return item;
   }
   return null;
+}
+
+async function deleteItem(itemId, event){
+  if (event) event.stopPropagation();
+  if (!confirm('Delete this item for everyone? This cannot be undone.')) return;
+  if (sb){
+    await sb.from('content_items').delete().eq('id', itemId);
+    await refreshState();
+  } else {
+    state.batches.forEach(b => { b.items = b.items.filter(i => i.id !== itemId); });
+  }
+  render();
+}
+
+async function deleteBatch(batchId, event){
+  if (event) event.stopPropagation();
+  if (!confirm('Delete this whole batch and everything in it? This cannot be undone.')) return;
+  if (sb){
+    await sb.from('batches').delete().eq('id', batchId);
+    await refreshState();
+  } else {
+    state.batches = state.batches.filter(b => b.id !== batchId);
+  }
+  render();
 }
 
 async function handleDecision(itemId, decision, btn){
