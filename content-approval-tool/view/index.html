@@ -34,6 +34,10 @@
       <button class="view-btn" data-view="scroll" title="Feed / long-scroll view">▤</button>
     </div>
     <button class="btn btn-ghost" id="igThemeToggle" title="Preview all IG posts in light or dark mode">🌙 IG Dark</button>
+    <label class="select-all-label">
+      <input type="checkbox" id="selectAllCheckbox" onchange="handleSelectAllToggle(this.checked)"> Select all
+    </label>
+    <button class="btn btn-ghost" id="deleteSelectedBtn" onclick="deleteSelectedItems()" disabled>🗑 Delete selected (0)</button>
     <div class="auth-panel" id="authPanel"></div>
     <button class="btn btn-ghost" id="newBatchBtn">+ New Batch</button>
   </div>

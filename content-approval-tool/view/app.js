@@ -155,6 +155,7 @@ function saveState(){
 }
 async function refreshState(){ state = await loadState(); }
 let state = { batches: [] };
+const selectedItems = new Set();
 
 /* ===================== AUTH (temporarily open — manual picker) =====================
    Google Sign-In is paused per Tara's call to consolidate on Metricool instead of a
@@ -468,6 +469,7 @@ function renderItem(item){
   return `
     <div class="item-card" data-item="${item.id}">
       <div class="item-meta-row">
+        <input type="checkbox" class="item-select" data-item="${item.id}" ${selectedItems.has(item.id) ? 'checked' : ''} onclick="toggleItemSelect('${item.id}')">
         <span class="category-chip ${CATEGORY_CLASS[item.category]}">${CATEGORY_LABELS[item.category]}</span>
         <span class="format-badge">IG ${item.format}</span>
         <span class="rev-badge">v${rev.revisionNumber}</span>
@@ -513,12 +515,13 @@ function renderItemRow(item){
   const status = itemStatus(item);
   const thumbMedia = getMediaList(rev)[0];
   const thumb = thumbMedia.type === 'video'
-    ? `<video src="${thumbMedia.url}" muted></video>`
+    ? `<video src="${toWebVideoUrl(thumbMedia.url)}" muted></video>`
     : `<img src="${thumbMedia.url}" alt="">`;
 
   return `
     <div class="item-row" data-item="${item.id}">
       <div class="item-row-head" onclick="toggleItemRow('${item.id}')">
+        <input type="checkbox" class="item-select" data-item="${item.id}" ${selectedItems.has(item.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleItemSelect('${item.id}')">
         <div class="item-row-thumb">${thumb}</div>
         <div class="item-row-body">
           <div class="item-row-top">
@@ -604,6 +607,53 @@ function render(){
   populateModalBatchSelect();
   populateViewSwitcher();
   updateIgThemeButton();
+  updateBulkBar();
+}
+
+function allItemIds(){
+  return state.batches.flatMap(b => b.items.map(i => i.id));
+}
+
+function updateBulkBar(){
+  const btn = document.getElementById('deleteSelectedBtn');
+  const selectAll = document.getElementById('selectAllCheckbox');
+  if (!btn) return;
+  // Prune stale ids so a batch-level or single delete elsewhere doesn't leave
+  // the count/checkbox out of sync with what's actually on screen.
+  const validIds = new Set(allItemIds());
+  Array.from(selectedItems).forEach(id => { if (!validIds.has(id)) selectedItems.delete(id); });
+  btn.textContent = `🗑 Delete selected (${selectedItems.size})`;
+  btn.disabled = selectedItems.size === 0;
+  const ids = allItemIds();
+  if (selectAll) selectAll.checked = ids.length > 0 && ids.every(id => selectedItems.has(id));
+}
+
+function toggleItemSelect(itemId){
+  if (selectedItems.has(itemId)) selectedItems.delete(itemId);
+  else selectedItems.add(itemId);
+  updateBulkBar();
+}
+
+function handleSelectAllToggle(checked){
+  const ids = allItemIds();
+  if (checked) ids.forEach(id => selectedItems.add(id));
+  else selectedItems.clear();
+  document.querySelectorAll('.item-select').forEach(cb => { cb.checked = checked; });
+  updateBulkBar();
+}
+
+async function deleteSelectedItems(){
+  if (!selectedItems.size) return;
+  if (!confirm(`Delete ${selectedItems.size} selected item(s) for everyone? This cannot be undone.`)) return;
+  const ids = Array.from(selectedItems);
+  if (sb){
+    await sb.from('content_items').delete().in('id', ids);
+    await refreshState();
+  } else {
+    state.batches.forEach(b => { b.items = b.items.filter(i => !selectedItems.has(i.id)); });
+  }
+  selectedItems.clear();
+  render();
 }
 
 /* ===================== INTERACTIONS ===================== */
@@ -623,6 +673,7 @@ function findItem(id){
 async function deleteItem(itemId, event){
   if (event) event.stopPropagation();
   if (!confirm('Delete this item for everyone? This cannot be undone.')) return;
+  selectedItems.delete(itemId);
   if (sb){
     await sb.from('content_items').delete().eq('id', itemId);
     await refreshState();
