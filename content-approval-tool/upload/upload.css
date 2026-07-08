@@ -30,24 +30,19 @@ body{
 header{
   text-align:center;
   margin-bottom:28px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
 }
-header .name{
-  font-family:var(--display);
-  font-size:28px;
-  font-style:italic;
-  font-weight:500;
-}
-header .name span{
+.brand-logo{height:34px;width:auto;display:block;}
+.brand-sub{
   font-family:var(--body);
-  font-style:normal;
   font-size:11px;
   font-weight:700;
   letter-spacing:1.5px;
   text-transform:uppercase;
   color:var(--dim);
-  margin-left:8px;
-  display:block;
-  margin-top:4px;
+  margin-top:8px;
 }
 header .tag{
   font-size:12.5px;

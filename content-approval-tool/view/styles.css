@@ -51,22 +51,15 @@ header{
   flex-direction:column;
   gap:2px;
 }
-.brand .name{
-  font-family:var(--display);
-  font-size:24px;
-  font-style:italic;
-  font-weight:500;
-  letter-spacing:0.2px;
-}
-.brand .name span{
+.brand-logo{height:30px;width:auto;display:block;}
+.brand-sub{
   font-family:var(--body);
-  font-style:normal;
   font-size:11px;
   font-weight:700;
   letter-spacing:1.5px;
   text-transform:uppercase;
   color:var(--dim);
-  margin-left:8px;
+  margin-top:2px;
 }
 .brand .tag{
   font-size:12px;
