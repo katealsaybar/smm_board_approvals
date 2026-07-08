@@ -369,13 +369,16 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
   border:1px solid #fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;margin-left:4px;
 }
 .ig-reel-bottom{
-  position:absolute;bottom:14px;left:10px;right:52px;color:#fff;
+  position:absolute;bottom:48px;left:10px;right:52px;color:#fff;
   text-shadow:0 1px 3px rgba(0,0,0,0.6);font-size:12px;line-height:1.4;
+  pointer-events:none;
 }
+.ig-reel-bottom .caption-more{pointer-events:auto;}
 .ig-reel-rail{
-  position:absolute;right:8px;bottom:14px;display:flex;flex-direction:column;
+  position:absolute;right:8px;bottom:48px;display:flex;flex-direction:column;
   align-items:center;gap:16px;color:#fff;font-size:22px;
   text-shadow:0 1px 3px rgba(0,0,0,0.6);
+  pointer-events:none;
 }
 .ig-reel-rail .count{font-size:11px;margin-top:-10px;}
 
@@ -391,9 +394,10 @@ main{max-width:1300px;margin:0 auto;padding:24px;}
 }
 .ig-story-head .time{font-size:11px;opacity:0.85;}
 .ig-story-reply{
-  position:absolute;bottom:14px;left:10px;right:10px;
+  position:absolute;bottom:48px;left:10px;right:10px;
   border:1px solid rgba(255,255,255,0.6);border-radius:22px;
   padding:8px 12px;color:rgba(255,255,255,0.8);font-size:12px;
+  pointer-events:none;
 }
 
 /* ---------- Review panel ---------- */
