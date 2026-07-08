@@ -268,6 +268,19 @@ function captionBadge(item){
   return captionChanged(item) ? ' <span class="updated-pill inline">Edited</span>' : '';
 }
 
+// Long captions get clamped to 2 lines with a real-IG-style "more"/"less" toggle
+// instead of stretching the card to fit the whole thing.
+function captionHtml(item, rev){
+  const text = escapeHtml(rev.caption) + captionBadge(item);
+  if (!rev.caption || rev.caption.length <= 80) return text;
+  return `<span class="ig-caption-text clamped">${text}</span><span class="caption-more" onclick="toggleCaptionClamp(this)"> more</span>`;
+}
+function toggleCaptionClamp(el){
+  const span = el.previousElementSibling;
+  const clamped = span.classList.toggle('clamped');
+  el.textContent = clamped ? ' more' : ' less';
+}
+
 // Phone-recorded .mov/HEVC files often play audio but show a black frame in
 // Chrome (no decode support) — request Cloudinary's transcoded mp4 instead,
 // which it generates on the fly regardless of the originally uploaded format.
@@ -320,7 +333,7 @@ function renderIgMock(item, rev, format){
         ${mediaList.length > 1 ? `<div class="ig-carousel-dots">${dots}</div>` : ''}
         <div class="ig-icons-row">❤️ 💬 ✈️<span class="spacer"></span>🔖</div>
         <div class="ig-likes">1,284 likes</div>
-        <div class="ig-caption"><b>tararosesalon</b>${escapeHtml(rev.caption)}${captionBadge(item)}</div>
+        <div class="ig-caption"><b>tararosesalon</b> ${captionHtml(item, rev)}</div>
         <div class="ig-viewcomments">View all 42 comments</div>
       </div></div>`;
   }
@@ -334,7 +347,7 @@ function renderIgMock(item, rev, format){
           <span class="ig-username">tararosesalon</span>
           <span class="ig-follow">Follow</span>
         </div>
-        <div class="ig-reel-bottom">${escapeHtml(rev.caption)}${captionBadge(item)}<br><span style="opacity:.8;">♪ original audio — tararosesalon</span></div>
+        <div class="ig-reel-bottom">${captionHtml(item, rev)}<br><span style="opacity:.8;">♪ original audio — tararosesalon</span></div>
         <div class="ig-reel-rail">
           <div>❤️<div class="count">2.4k</div></div>
           <div>💬<div class="count">184</div></div>
