@@ -41,6 +41,7 @@ a{color:inherit}
 .sc-seg button.on,.sc-seg button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
 .slv-muted{font-size:13.5px;color:var(--muted);margin:12px 2px 0}
 
+.scal-small{margin:-6px 0 0;font-size:13px;color:var(--muted2);text-align:center}
 [hidden]{display:none!important}
 
 /* Answer actions */

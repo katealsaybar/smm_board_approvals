@@ -150,7 +150,7 @@ function scalBest() {
 function scalBadgeFg(hex) { const n = parseInt(hex.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > .6 ? '#1A1A1A' : '#FFFFFF'; }
 const scalStyle = (p, cols) => `--c:${cols[p.net]};--bf:${scalBadgeFg(cols[p.net])};--g:linear-gradient(155deg,hsl(${scalHue(p.id)} 45% 62%),hsl(${(scalHue(p.id) + 30) % 360} 35% 38%))`;
 const SCAL_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
-const scalImg = p => p.img ? `<img src="${mkEsc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+const scalImg = (p, panel) => p.img ? `<img src="${mkEsc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"${panel ? ' onload="scalFit(this)"' : ''}>` : '';
 const scalLabel = p => `${SOC_NETS[p.net]} ${SCAL_KIND[p.kind]}, ${scalClock(p.t) || 'time not known'}, ${p.cap.slice(0, 80)}, ${scalFmt(p.likes)} likes`;
 const scalCap = p => mkEsc(p.cap || '(no caption)');
 const scalStats = p => `<b>${scalFmt(p.likes)}</b> likes · <b>${scalFmt(p.comments)}</b> comments`;
@@ -303,7 +303,7 @@ function scalPanelHtml(p, cols, posts) {
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">
       ${verdict}
-      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p)}${scalIsVideo(p) ? `<span class="scal-vid">${SCAL_PLAY}</span>` : ''}</div>
+      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${scalIsVideo(p) ? `<span class="scal-vid">${SCAL_PLAY}</span>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <p class="scal-pcap">${scalCap(p)}</p>
       <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
@@ -445,3 +445,13 @@ calEl('theme').textContent = calDark() ? 'Light mode' : 'Dark mode';
 calEl('scalRoot').innerHTML = '<p class="slv-muted">Loading the posts…</p>';
 scalEnsure();
 calPlanLoad();
+
+// Some pictures arrive small (Facebook gives about 130 pixels wide). Stretched to the panel's width they turn to mush, so they show at about their own size, with a note.
+function scalFit(img) {
+  const w = img.naturalWidth, box = img.parentElement; if (!box || !w || w >= 300) return;
+  box.style.maxWidth = Math.round(Math.max(w * 1.6, 160)) + 'px';
+  if (!box.nextElementSibling || !box.nextElementSibling.classList.contains('scal-small')) {
+    const n = document.createElement('p'); n.className = 'scal-small'; n.textContent = 'This is the small preview the app gives us. Open the post to see it in full.';
+    box.insertAdjacentElement('afterend', n);
+  }
+}
