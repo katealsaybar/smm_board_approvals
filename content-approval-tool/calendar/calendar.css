@@ -41,6 +41,11 @@ a{color:inherit}
 .sc-seg button.on,.sc-seg button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
 .slv-muted{font-size:13.5px;color:var(--muted);margin:12px 2px 0}
 
+/* Embedded in the dashboard: no logo bar, the dashboard's own page behind it */
+.embedded .topbar{display:none}
+.embedded body{background:transparent}
+.embedded .wrap{padding-top:6px;padding-bottom:40px}
+.scal-pill .k{flex:none;font-size:10px;opacity:.85}
 .scal-small{margin:-6px 0 0;font-size:13px;color:var(--muted2);text-align:center}
 [hidden]{display:none!important}
 

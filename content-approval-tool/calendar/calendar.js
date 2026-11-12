@@ -22,6 +22,20 @@ const socCols = () => calDark()
   : { instagram: '#A23B8C', facebook: '#2F62B5', tiktok: '#0E7C78', youtube: '#B8322A' };
 const calSafeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';
 
+// Embedded in the dashboard (Kate, 12 Nov 2026): the dashboard's Content Calendar page shows this page in a frame, so the main sidebar stays. ?embed=1 hides this
+// page's own logo bar, and the page follows the dashboard's light or dark (?theme= at the start, then a trs-theme message from the dashboard).
+const calParams = new URLSearchParams(location.search);
+const calEmbedded = calParams.get('embed') === '1' && window.parent !== window;
+if (calEmbedded) {
+  document.documentElement.classList.add('embedded');
+  const th0 = calParams.get('theme'); if (th0 === 'dark' || th0 === 'light') document.documentElement.setAttribute('data-theme', th0);
+  window.addEventListener('message', e => {
+    if (e.source !== window.parent || !e.data || e.data.type !== 'trs-theme' || (e.data.theme !== 'dark' && e.data.theme !== 'light')) return;
+    document.documentElement.setAttribute('data-theme', e.data.theme);
+    if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
+  });
+}
+
 // ──────────────────────────────────────────────────────────────────────────────────────
 // The calendar (from the dashboard's social-calendar.js)
 // ──────────────────────────────────────────────────────────────────────────────────────
@@ -244,7 +258,7 @@ function scalMonthHtml(posts, cols, per, today) {
   const pill = p => { const cur = scal.sel === p.id ? ' aria-current="true"' : '';
     return solo
       ? `<button type="button" class="scal-tile" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tm">${scalClock(p.t, true)}</span></button>`
-      : `<button type="button" class="scal-pill" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span><span class="t">${scalClock(p.t, true)}</span><span class="c">${scalCap(p)}</span></button>`; };
+      : `<button type="button" class="scal-pill" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span><span class="t">${scalClock(p.t, true)}</span>${scalIsVideo(p) ? `<span class="k" title="${SCAL_KIND[p.kind]}" aria-hidden="true">▶</span>` : ''}<span class="c">${scalCap(p)}</span></button>`; };
   let cells = '';
   for (let i = 0; i < total; i++) {
     const day = i - lead + 1, inM = day >= 1 && day <= nd, iso = inM ? per.from.slice(0, 8) + String(day).padStart(2, '0') : '';
@@ -271,7 +285,7 @@ function scalListRowsHtml(posts, cols) {
     return `<button type="button" class="scal-lrow" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)">
       <span class="d"><b>${scalShort(p.date)}</b><span>${scalClock(p.t) || 'Time not known'}</span></span>
       <span class="pc"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tx"><span class="cp">${scalCap(p)}</span><span class="mini">${SOC_NETS[p.net]} · ${scalFmt(p.likes)} likes · ${scalFmt(p.comments)} comments</span></span></span>
-      <span class="pl"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${SOC_NETS[p.net]}</span>
+      <span class="pl"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${SOC_NETS[p.net]} · ${SCAL_KIND[p.kind]}</span>
       <span class="n">${scalFmt(p.likes)}</span><span class="n">${scalFmt(p.reposts)}</span><span class="n">${scalFmt(p.comments)}</span><span class="n">${scalFmt(p.views)}</span></button>`;
   }).join('') : '<div class="scal-empty" style="padding:16px 4px">No posts match.</div>');
 }
@@ -439,7 +453,7 @@ calEl('theme').addEventListener('click', () => {
   calEl('theme').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
   scalPaint();
 });
-try { const th = localStorage.getItem('trs-approvals-theme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch (e) {}
+if (!calEmbedded) { try { const th = localStorage.getItem('trs-approvals-theme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch (e) {} }
 calEl('theme').textContent = calDark() ? 'Light mode' : 'Dark mode';
 
 calEl('scalRoot').innerHTML = '<p class="slv-muted">Loading the posts…</p>';
