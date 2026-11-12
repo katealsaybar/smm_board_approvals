@@ -46,6 +46,15 @@ a{color:inherit}
 .embedded body{background:transparent}
 .embedded .wrap{padding-top:6px;padding-bottom:40px}
 .scal-pill .k{flex:none;font-size:10px;opacity:.85}
+/* Embedded in the dashboard (Kate, 12 Nov 2026): no scroll bar drawn inside the frame (it scrolls by wheel or touch), and, on a wide screen, the month and view bar is the dashboard's
+   masthead bar instead (the frame sends its state up, trs-cal-state, and takes commands back). On a phone the masthead bar is inside a sheet, so this bar stays. */
+.embedded,.embedded *{scrollbar-width:none}
+.embedded ::-webkit-scrollbar{display:none}
+@media(min-width:761px){.embedded .scal-month{display:none}}
+/* Play it here: the panel's play sign is a button, and the player replaces the picture */
+button.scal-vid{border:0;padding:0;cursor:pointer;transition:transform .12s}
+button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
+.scal-player{width:100%;border:0;border-radius:14px;background:#000;display:block}
 .scal-small{margin:-6px 0 0;font-size:13px;color:var(--muted2);text-align:center}
 [hidden]{display:none!important}
 

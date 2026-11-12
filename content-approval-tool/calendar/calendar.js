@@ -21,6 +21,9 @@ const socCols = () => calDark()
   ? { instagram: '#E58BD0', facebook: '#8FB4F0', tiktok: '#6FE0DA', youtube: '#FF9B94' }
   : { instagram: '#A23B8C', facebook: '#2F62B5', tiktok: '#0E7C78', youtube: '#B8322A' };
 const calSafeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';
+// Kate, 12 Nov 2026, "remove crossed out box for now": the plan form in the post panel (What did you notice? / Try it again / Add to next month's plan) and the
+// Next month's plan list below the calendar are off. Set this to true to bring both back; the database side (content_plan_*) is untouched.
+const CAL_PLAN_ON = false;
 
 // Embedded in the dashboard (Kate, 12 Nov 2026): the dashboard's Content Calendar page shows this page in a frame, so the main sidebar stays. ?embed=1 hides this
 // page's own logo bar, and the page follows the dashboard's light or dark (?theme= at the start, then a trs-theme message from the dashboard).
@@ -29,10 +32,22 @@ const calEmbedded = calParams.get('embed') === '1' && window.parent !== window;
 if (calEmbedded) {
   document.documentElement.classList.add('embedded');
   const th0 = calParams.get('theme'); if (th0 === 'dark' || th0 === 'light') document.documentElement.setAttribute('data-theme', th0);
+  // The dashboard sends two things, and only the page that holds this frame is listened to (e.source is the parent):
+  //   trs-theme  { theme: 'dark' | 'light' }
+  //   trs-cal-cmd { cmd: 'prev' | 'next' | 'today' | 'view', value }   the buttons of the dashboard's masthead bar (Kate, 12 Nov 2026: month or week, Today, Week | Month | List moved up there)
+  // and this page answers with trs-cal-state (scalPostState, below).
   window.addEventListener('message', e => {
-    if (e.source !== window.parent || !e.data || e.data.type !== 'trs-theme' || (e.data.theme !== 'dark' && e.data.theme !== 'light')) return;
-    document.documentElement.setAttribute('data-theme', e.data.theme);
-    if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
+    if (e.source !== window.parent || !e.data) return;
+    if (e.data.type === 'trs-theme' && (e.data.theme === 'dark' || e.data.theme === 'light')) {
+      document.documentElement.setAttribute('data-theme', e.data.theme);
+      if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
+    } else if (e.data.type === 'trs-cal-cmd' && typeof scal !== 'undefined' && scal.ws) {
+      const c = e.data.cmd;
+      if (c === 'prev') scalNav(-1);
+      else if (c === 'next') scalNav(1);
+      else if (c === 'today') scalToToday();
+      else if (c === 'view' && ['week', 'month', 'list'].includes(e.data.value)) scalView(e.data.value);
+    }
   });
 }
 
@@ -320,7 +335,7 @@ function scalPanelHtml(p, cols, posts) {
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">
       ${verdict}
-      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${scalIsVideo(p) ? `<span class="scal-vid">${SCAL_PLAY}</span>` : ''}</div>
+      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${scalIsVideo(p) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="Play this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <p class="scal-pcap">${scalCap(p)}</p>
       <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
@@ -432,6 +447,7 @@ let calPlan = [], calPlanErr = false, calSaving = false;
 const calNextMonday = () => scalAdd(scalMon(scalToday()), 7);
 
 function scalTryHtml(p) {
+  if (!CAL_PLAN_ON) return '';
   return `<div class="scal-try"><div><label for="scalNotice">What did you notice?</label><input id="scalNotice" type="text" maxlength="500" placeholder="One line is plenty"></div>
     <div class="scal-sec" style="margin:0">Try it again</div>
     <div class="row"><div><label for="scalOwner">Who posts it</label><input id="scalOwner" type="text" maxlength="80" placeholder="Name"></div>
@@ -508,6 +524,18 @@ async function scalDownload(kind) {
 // ──────────────────────────────────────────────────────────────────────────────────────
 // Start-up and theme
 // ──────────────────────────────────────────────────────────────────────────────────────
+// Embedded (Kate, 12 Nov 2026): tell the dashboard where the calendar is (the stretch on show, the view, whether Previous or Next can go further) after every draw,
+// so its masthead bar can show it. The dashboard's buttons send trs-cal-cmd back (head.js). Only a label and a few flags go out, so the target is any parent.
+function scalPostState() {
+  if (!calEmbedded || !scal.ws) return;
+  const per = scalPeriod(), today = scalToday();
+  const atMin = per.kind === 'week' ? scal.ws <= scalMon(SCAL_FIRST + '-01') : scal.month <= SCAL_FIRST;
+  const atMax = per.kind === 'week' ? scal.ws >= scalMon(today) : scal.month >= today.slice(0, 7);
+  try { window.parent.postMessage({ type: 'trs-cal-state', label: per.label, view: scal.view, atMin, atMax }, '*'); } catch (e) {}
+}
+const scalPaintInner = scalPaint;
+scalPaint = function () { scalPaintInner(); scalPostState(); };
+
 const calEl = id => document.getElementById(id);
 calEl('theme').addEventListener('click', () => {
   const next = calDark() ? 'light' : 'dark';
@@ -521,7 +549,7 @@ calEl('theme').textContent = calDark() ? 'Light mode' : 'Dark mode';
 
 calEl('scalRoot').innerHTML = '<p class="slv-muted">Loading the posts…</p>';
 scalEnsure();
-calPlanLoad();
+if (CAL_PLAN_ON) calPlanLoad(); else { const ps = calEl('planSection'); if (ps) ps.hidden = true; }
 
 // Some pictures arrive small (Facebook gives about 130 pixels wide). Stretched to the panel's width they turn to mush, so they show at about their own size, with a note.
 function scalFit(img) {
@@ -531,4 +559,26 @@ function scalFit(img) {
     const n = document.createElement('p'); n.className = 'scal-small'; n.textContent = 'This is the small preview the app gives us. Open the post to see it in full.';
     box.insertAdjacentElement('afterend', n);
   }
+}
+
+// Play it here (Kate, 12 Nov 2026): the picture's play sign loads the platform's own player, from the post's link, only when it is pressed (nothing from Instagram,
+// Facebook or TikTok loads before that). A post with no link the player understands opens on its own app instead.
+function scalEmbedUrl(p) {
+  const u = calSafeUrl(p.url); if (!u) return null;
+  try {
+    const x = new URL(u), host = x.hostname.replace(/^www\./, '');
+    if (p.net === 'instagram' && host === 'instagram.com') { const m = x.pathname.match(/^\/(reel|p|tv)\/([A-Za-z0-9_-]+)/); return m ? { src: 'https://www.instagram.com/' + m[1] + '/' + m[2] + '/embed/', h: 600 } : null; }
+    if (p.net === 'facebook' && host === 'facebook.com') return { src: 'https://www.facebook.com/plugins/video.php?show_text=false&width=380&href=' + encodeURIComponent(u), h: 520 };
+    if (p.net === 'tiktok' && host === 'tiktok.com') { const m = x.pathname.match(/\/video\/(\d+)/); return m ? { src: 'https://www.tiktok.com/embed/v2/' + m[1], h: 620 } : null; }
+  } catch (e) {}
+  return null;
+}
+function scalPlay(id) {
+  const p = scalFind(id); if (!p) return;
+  const e = scalEmbedUrl(p), pic = document.querySelector('.scal-pic');
+  if (!e || !pic) { if (calSafeUrl(p.url)) window.open(calSafeUrl(p.url), '_blank', 'noopener'); return; }
+  const f = document.createElement('iframe');
+  f.src = e.src; f.title = 'Play this ' + SCAL_KIND[p.kind]; f.className = 'scal-player'; f.style.height = e.h + 'px';
+  f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'; f.allowFullscreen = true; f.referrerPolicy = 'strict-origin-when-cross-origin';
+  pic.replaceWith(f);
 }
