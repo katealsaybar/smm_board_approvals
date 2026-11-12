@@ -1,22 +1,15 @@
 /* Content Calendar, inside Post Approvals (Kate, 12 Nov 2026).
    Every post we made on Instagram, Facebook and TikTok, on a calendar, with what worked and a plan for next month.
-   It reads the same social_report() as the dashboard's Social > Calendar tab, as the signed-in dashboard user, so the database decides who sees it:
-   Level 3 and above, the dashboard login (Google, or email and password). Nothing here is public. The plan (one action, one owner, one date) is kept
-   by content_plan_* in the same database (migrations/content_calendar_plan.sql in the dashboard repo).
+   No login, like the rest of Post Approvals (Kate, 12 Nov 2026). It reads content_calendar_posts(), which answers the public key and returns only what
+   anyone can already see on a post (caption, picture, link, time, likes, comments, plays on reels and videos, shares), never reach, saves or impressions.
+   The plan (one action, one owner, one date) is kept by content_plan_* in the same database (migrations/content_calendar_open.sql in the dashboard repo).
    The calendar part (scal*) is the dashboard's social-calendar.js; the helpers it expects from the dashboard are defined just below. */
 'use strict';
 
-// A failed Google try leaves ?error= on the address, and supabase-js then ignores a later good session. Note it, clear it, carry on.
-let calUrlError = '';
-if (/[?&#](error|error_description)=/.test(location.search + location.hash)) {
-  try { calUrlError = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search).get('error_description') || 'Sign-in did not finish.'; } catch (e) { calUrlError = 'Sign-in did not finish.'; }
-  history.replaceState(null, '', location.pathname);
-}
-
-// The dashboard's own project and its publishable key (public by design, the same one the dashboard pages carry); every table sits behind the sign-in.
+// The dashboard's own project and its publishable key (public by design, the same one the dashboard pages carry). Tables are closed to it; only the content_* functions answer.
 const CAL_URL = 'https://gvijxenafoowajqktqvd.supabase.co';
 const CAL_KEY = 'sb_publishable_e5o0vPayb-6552oARTeu7Q_KoqfT7xO';
-const sb = supabase.createClient(CAL_URL, CAL_KEY);
+const sb = supabase.createClient(CAL_URL, CAL_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 
 // Helpers the dashboard calendar expects.
 const mkIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -106,7 +99,7 @@ const scalIsVideo = p => p.kind === 'reel' || p.kind === 'video';
 
 async function scalLoad(key) {
   if (scalCache[key]) return;
-  const { data, error } = await sb.rpc('social_report', { p_from: key + '-01', p_to: scalMonthEnd(key) });
+  const { data, error } = await sb.rpc('content_calendar_posts', { p_from: key + '-01', p_to: scalMonthEnd(key) });
   if (error || !data) throw error || new Error('no data');
   scalCache[key] = (data.posts || []).filter(p => SCAL_NETS.includes(p.network)).map((p, i) => scalPost(p, i, key))
     .sort((a, b) => (a.at || a.date) < (b.at || b.date) ? -1 : 1);
@@ -160,7 +153,7 @@ const SCAL_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l
 const scalImg = p => p.img ? `<img src="${mkEsc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
 const scalLabel = p => `${SOC_NETS[p.net]} ${SCAL_KIND[p.kind]}, ${scalClock(p.t) || 'time not known'}, ${p.cap.slice(0, 80)}, ${scalFmt(p.likes)} likes`;
 const scalCap = p => mkEsc(p.cap || '(no caption)');
-const scalStats = p => `<b>${scalFmt(p.likes)}</b> likes · <b>${scalFmt(p.views)}</b> ${p.viewLabel === 'Impressions' ? 'impressions' : 'views'}`;
+const scalStats = p => `<b>${scalFmt(p.likes)}</b> likes · <b>${scalFmt(p.comments)}</b> comments`;
 
 function scalTile(p, cols, cls) {
   const cur = scal.sel === p.id ? ' aria-current="true"' : '';
@@ -178,7 +171,7 @@ function scalPaint() {
   const root = document.getElementById('scalRoot'); if (!root) return;
   const cols = socCols(), per = scalPeriod(), posts = scalPosts(per), today = scalToday();
   const nOn = SCAL_NETS.filter(n => scal.on[n]).length, allOn = nOn === SCAL_NETS.length;
-  const best = posts.length ? posts.reduce((a, b) => (b.views || 0) > (a.views || 0) ? b : a) : null;
+  const best = posts.length ? posts.reduce((a, b) => (b.likes || 0) > (a.likes || 0) ? b : a) : null;
   const atMin = per.kind === 'week' ? scal.ws <= scalMon(SCAL_FIRST + '-01') : scal.month <= SCAL_FIRST;
   const atMax = per.kind === 'week' ? scal.ws >= scalMon(today) : scal.month >= today.slice(0, 7);
   const late = SCAL_NETS.filter(n => scal.on[n] && per.from.slice(0, 7) < SCAL_START[n]);
@@ -193,7 +186,7 @@ function scalPaint() {
   if (scal.busy && !posts.length) answer = 'Loading the posts…';
   else if (scal.err) answer = 'The posts did not load. Refresh to try again.';
   else if (!posts.length) answer = `No posts in <b>${mkEsc(per.label)}</b> with these platforms.`;
-  else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.views)} ${best.viewLabel.toLowerCase()}.`;
+  else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.likes)} likes.`;
 
   const hint = nOn === 1 ? 'Showing one platform. Tap another to add it.' : allOn ? 'Showing everything. Tap one platform to see just that one.' : `Showing ${nOn} platforms together, one colour each.`;
   const viewBtns = [['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([k, l]) => `<button type="button" class="${scal.view === k ? 'on' : ''}" aria-pressed="${scal.view === k}" onclick="scalView('${k}')">${l}</button>`).join('');
@@ -221,7 +214,7 @@ function scalPaint() {
       <div class="scal-cal">${body}</div>
       ${scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
     </div>
-    <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories are not on the calendar.</p>`;
+    <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories are not on the calendar. Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
   if (scal.sel) { const c = root.querySelector('.scal-close'); if (c && scal.focusPanel) { c.focus(); scal.focusPanel = false; } }
 }
 
@@ -277,7 +270,7 @@ function scalListRowsHtml(posts, cols) {
     const cur = scal.sel === p.id ? ' aria-current="true"' : '';
     return `<button type="button" class="scal-lrow" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)">
       <span class="d"><b>${scalShort(p.date)}</b><span>${scalClock(p.t) || 'Time not known'}</span></span>
-      <span class="pc"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tx"><span class="cp">${scalCap(p)}</span><span class="mini">${SOC_NETS[p.net]} · ${scalFmt(p.likes)} likes · ${scalFmt(p.views)} ${p.viewLabel.toLowerCase()}</span></span></span>
+      <span class="pc"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tx"><span class="cp">${scalCap(p)}</span><span class="mini">${SOC_NETS[p.net]} · ${scalFmt(p.likes)} likes · ${scalFmt(p.comments)} comments</span></span></span>
       <span class="pl"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${SOC_NETS[p.net]}</span>
       <span class="n">${scalFmt(p.likes)}</span><span class="n">${scalFmt(p.reposts)}</span><span class="n">${scalFmt(p.comments)}</span><span class="n">${scalFmt(p.views)}</span></button>`;
   }).join('') : '<div class="scal-empty" style="padding:16px 4px">No posts match.</div>');
@@ -302,7 +295,7 @@ function scalPanelHtml(p, cols, posts) {
     verdict = r >= 1.5 ? `<div class="scal-verdict up">Did well: ${(Math.round(r * 10) / 10)} times the usual likes for ${SOC_NETS[p.net]} in this period.</div>`
       : r >= .8 ? `<div class="scal-verdict">About the usual likes for ${SOC_NETS[p.net]} in this period.</div>`
       : `<div class="scal-verdict down">Quieter than usual for ${SOC_NETS[p.net]} in this period.</div>`; }
-  const nums = [['Likes', p.likes], [p.repostLabel, p.reposts], [p.viewLabel, p.views], ['Reach', p.reach], ['Comments', p.comments], ['Saves', p.saves]].filter(([, v]) => v !== null);
+  const nums = [['Likes', p.likes], ['Comments', p.comments], [p.repostLabel, p.reposts], ['Plays', p.views]].filter(([, v]) => v !== null);
   const verb = p.net === 'instagram' ? 'Instagram' : p.net === 'facebook' ? 'Facebook' : 'TikTok';
   return `<aside class="scal-panel" role="dialog" aria-label="Post details" style="${scalStyle(p, cols)}">
     <div class="scal-ph"><span class="scal-b" aria-hidden="true">${SCAL_CODE[p.net]}</span>
@@ -415,8 +408,8 @@ document.addEventListener('click', async e => {
 function scalTable() {
   const per = scalPeriod(), posts = scalPosts(per).slice().sort((a, b) => (a.at || a.date) < (b.at || b.date) ? -1 : 1);
   if (!posts.length) return null;
-  const head = ['Date', 'Time (Dubai)', 'Platform', 'Type', 'Caption', 'Likes', 'Reposts or shares', 'Views or impressions', 'Which one', 'Reach', 'Comments', 'Saves', 'Link'];
-  const rows = posts.map(p => [p.date, scalClock(p.t) || '', SOC_NETS[p.net], SCAL_KIND[p.kind], p.cap.replace(/\s+/g, ' ').slice(0, 300), p.likes, p.reposts, p.views, p.viewLabel, p.reach, p.comments, p.saves, calSafeUrl(p.url)]);
+  const head = ['Date', 'Time (Dubai)', 'Platform', 'Type', 'Caption', 'Likes', 'Comments', 'Reposts or shares', 'Plays (reels and videos)', 'Link'];
+  const rows = posts.map(p => [p.date, scalClock(p.t) || '', SOC_NETS[p.net], SCAL_KIND[p.kind], p.cap.replace(/\s+/g, ' ').slice(0, 300), p.likes, p.comments, p.reposts, p.views, calSafeUrl(p.url)]);
   return { name: ['social-posts', per.from, 'to', per.to].join('-'), head, rows };
 }
 // A cell that starts with = + - or @ would run as a formula in a spreadsheet; a leading apostrophe keeps it as text.
@@ -430,56 +423,25 @@ async function scalDownload(kind) {
   }
   try {
     if (!window.XLSX) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
-    const ws = XLSX.utils.aoa_to_sheet([t.head, ...t.rows.map(r => r.map(calCell))]); ws['!cols'] = t.head.map((h, i) => ({ wch: i === 4 ? 60 : i === 12 ? 40 : 16 }));
+    const ws = XLSX.utils.aoa_to_sheet([t.head, ...t.rows.map(r => r.map(calCell))]); ws['!cols'] = t.head.map((h, i) => ({ wch: i === 4 ? 60 : i === 9 ? 40 : 16 }));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Posts'); XLSX.writeFile(wb, t.name + '.xlsx');
   } catch (e) { console.error(e); calToast('The XLSX file did not build. CSV still works.'); }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
-// Sign-in (the dashboard login) and start-up
+// Start-up and theme
 // ──────────────────────────────────────────────────────────────────────────────────────
 const calEl = id => document.getElementById(id);
-function calShow(which) { calEl('gate').hidden = which !== 'gate'; calEl('app').hidden = which !== 'app'; }
-// signedIn: the person is signed in but may not open this page, so the sign-in form is hidden and only the reason and Sign out show.
-function calGate(msg, signedIn) {
-  calShow('gate'); calEl('gateErr').textContent = msg || ''; calEl('gateErr').hidden = !msg; calEl('who').hidden = !signedIn;
-  calEl('gate').classList.toggle('denied', !!signedIn); calEl('gateTitle').textContent = signedIn ? 'Not for this login' : 'Sign in';
-}
-
-async function calStart() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { calGate(calUrlError ? 'Sign-in did not finish: ' + calUrlError : ''); return; }
-  const me = await sb.rpc('dashboard_me');
-  const row = !me.error && Array.isArray(me.data) ? me.data[0] : null;
-  if (!row) { calGate('This login is not on the dashboard list. Ask Kate to add it, then sign in again.', true); calEl('whoName').textContent = ''; return; }
-  if ((row.level || 0) < 3) { calGate('The Content Calendar is for Level 3 and above (Executives and Marketing). Ask Kate if you need it.', true); calEl('whoName').textContent = 'Hello ' + String(row.name || '').split(' ')[0]; return; }
-  calEl('whoName').textContent = 'Hello ' + String(row.name || '').split(' ')[0]; calEl('who').hidden = false;
-  calShow('app');
-  calEl('scalRoot').innerHTML = '<p class="slv-muted">Loading the posts…</p>';
-  scalEnsure(); calPlanLoad();
-}
-
-calEl('googleBtn').addEventListener('click', async () => {
-  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
-  if (error) calGate('Google sign-in did not start: ' + error.message);
-});
-calEl('pwForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const btn = calEl('pwBtn'); btn.disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: calEl('pwEmail').value.trim(), password: calEl('pwPass').value });
-  btn.disabled = false;
-  if (error) { calEl('gateErr').textContent = error.message === 'Invalid login credentials' ? 'That email and password do not match.' : error.message; calEl('gateErr').hidden = false; return; }
-  calEl('pwPass').value = ''; calStart();
-});
-calEl('signOut').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
 calEl('theme').addEventListener('click', () => {
   const next = calDark() ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   try { localStorage.setItem('trs-approvals-theme', next); } catch (e) {}
   calEl('theme').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
-  if (!calEl('app').hidden) scalPaint();
+  scalPaint();
 });
-try { const t = localStorage.getItem('trs-approvals-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+try { const th = localStorage.getItem('trs-approvals-theme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch (e) {}
 calEl('theme').textContent = calDark() ? 'Light mode' : 'Dark mode';
 
-calStart();
+calEl('scalRoot').innerHTML = '<p class="slv-muted">Loading the posts…</p>';
+scalEnsure();
+calPlanLoad();

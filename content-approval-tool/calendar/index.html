@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>Content Calendar · Tara Rose</title>
-<link rel="stylesheet" href="calendar.css?v=1">
+<link rel="stylesheet" href="calendar.css?v=2">
 </head>
 <body>
 <div class="wrap">
@@ -17,28 +17,11 @@
       <a class="back" href="../index.html">‹ Content Approval</a>
     </div>
     <div class="who">
-      <span id="whoName"></span>
-      <span id="who" hidden><button type="button" id="signOut">Sign out</button></span>
       <button type="button" id="theme">Dark mode</button>
     </div>
   </div>
 
-  <!-- Sign in: the dashboard login. Level 3 and above (Executives and Marketing). -->
-  <section class="gate" id="gate" hidden aria-labelledby="gateTitle">
-    <h2 id="gateTitle">Sign in</h2>
-    <p>Use your dashboard login. The Content Calendar shows how our posts did, so it is for Level 3 and above.</p>
-    <button type="button" class="btn primary" id="googleBtn">Continue with Google</button>
-    <div class="or">or</div>
-    <form id="pwForm" autocomplete="on">
-      <div><label for="pwEmail">Email</label><input id="pwEmail" type="email" autocomplete="username" required></div>
-      <div style="margin-top:10px"><label for="pwPass">Password</label><input id="pwPass" type="password" autocomplete="current-password" required></div>
-      <button type="submit" class="btn" id="pwBtn" style="margin-top:14px;width:100%">Sign in</button>
-    </form>
-    <p class="err" id="gateErr" role="alert" hidden></p>
-    <p class="forgot" style="font-size:13.5px">Forgot your password? Use Forgot password on the dashboard sign-in, then come back here.</p>
-  </section>
-
-  <main id="app" hidden>
+  <main id="app">
     <header class="head">
       <div class="eyebrow">Marketing</div>
       <h1>Content calendar</h1>
@@ -60,6 +43,6 @@
 <div class="toast" id="toast" hidden role="status"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="calendar.js?v=1"></script>
+<script src="calendar.js?v=2"></script>
 </body>
 </html>
