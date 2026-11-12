@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Content Calendar · Tara Rose</title>
+<link rel="stylesheet" href="calendar.css?v=1">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <img src="../assets/tara-rose-logo.png" alt="Tara Rose Salons">
+      <a class="back" href="../index.html">‹ Content Approval</a>
+    </div>
+    <div class="who">
+      <span id="whoName"></span>
+      <span id="who" hidden><button type="button" id="signOut">Sign out</button></span>
+      <button type="button" id="theme">Dark mode</button>
+    </div>
+  </div>
+
+  <!-- Sign in: the dashboard login. Level 3 and above (Executives and Marketing). -->
+  <section class="gate" id="gate" hidden aria-labelledby="gateTitle">
+    <h2 id="gateTitle">Sign in</h2>
+    <p>Use your dashboard login. The Content Calendar shows how our posts did, so it is for Level 3 and above.</p>
+    <button type="button" class="btn primary" id="googleBtn">Continue with Google</button>
+    <div class="or">or</div>
+    <form id="pwForm" autocomplete="on">
+      <div><label for="pwEmail">Email</label><input id="pwEmail" type="email" autocomplete="username" required></div>
+      <div style="margin-top:10px"><label for="pwPass">Password</label><input id="pwPass" type="password" autocomplete="current-password" required></div>
+      <button type="submit" class="btn" id="pwBtn" style="margin-top:14px;width:100%">Sign in</button>
+    </form>
+    <p class="err" id="gateErr" role="alert" hidden></p>
+    <p class="forgot" style="font-size:13.5px">Forgot your password? Use Forgot password on the dashboard sign-in, then come back here.</p>
+  </section>
+
+  <main id="app" hidden>
+    <header class="head">
+      <div class="eyebrow">Marketing</div>
+      <h1>Content calendar</h1>
+      <p>See what we posted, when, and how it did, so next month's plan starts from what worked.</p>
+    </header>
+
+    <div id="scalRoot" class="scal" style="margin-top:14px"></div>
+
+    <section class="plan" id="planSection" aria-label="Next month's plan">
+      <h3>Next month's plan, from what worked</h3>
+      <p>Open a post, tell us what you noticed, and add one action, one owner, one date.</p>
+      <ul id="planList"></ul>
+      <div class="empty" id="planEmpty">Nothing added yet.</div>
+      <p class="empty" id="planErr" hidden>The plan did not load. Refresh to try again.</p>
+    </section>
+  </main>
+
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="calendar.js?v=1"></script>
+</body>
+</html>
