@@ -372,15 +372,22 @@ function scalPanelHtml(p, cols, posts) {
       ${verdict}
       <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${(scalIsVideo(p) || scalEmbedUrl(p)) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="${scalIsVideo(p) ? 'Play' : 'Show'} this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
-      <p class="scal-pcap">${scalCap(p)}</p>
+      <div><div class="scal-sec">Caption</div><p class="scal-pcap full">${scalCap(p)}</p></div>
       <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
       ${scalTryHtml(p)}
-    </div></aside><div class="scal-scrim" onclick="scalClose()"></div>`;
+    </div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
 }
 
 // ── Doing things ──────────────────────────────────────────────────────────────────
 function scalOpen(id) { scal.sday = null; scal.sel = id; scal.focusPanel = true; scalPaint(); }
 function scalClose() { scal.sel = null; scal.sday = null; scalPaint(); }
+// A click outside the window closes it, and when it landed on something in the calendar (a post, a story, a day) that opens too: no need to close first (Kate, 13 Nov 2026).
+function scalScrimClick(e) {
+  const x = e.clientX, y = e.clientY;
+  scalClose();
+  const el = document.elementFromPoint(x, y), b = el && el.closest('button,[onclick]');
+  if (b && b.closest('.scal-cal') && !b.closest('.scal-panel')) b.click();
+}
 function scalPlat(n) {
   const allOn = SCAL_NETS.every(x => scal.on[x]);
   if (n === 'all') SCAL_NETS.forEach(x => { scal.on[x] = true; });
@@ -462,7 +469,7 @@ function scalStoryChips(list, cols) {
   if (!list.length) return '';
   return '<div class="scal-schips">' + list.slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1).map(x => {
     const c = cols[x.net], st = scalStatOf(x), tip = SOC_NETS[x.net] + ' story, ' + (scalClock(x.t) || 'time not known') + (st && st.views != null ? ', ' + scalFmt(st.views) + ' views' : '');
-    return `<button type="button" class="scal-schip" style="--c:${c};--bf:${scalBadgeFg(c)}" title="${mkEsc(tip)}" aria-label="${mkEsc(tip)}" onclick="event.stopPropagation();scalStoryOpen('${x.date}','${x.net}','${x.at || ''}')"><span class="scal-sth">${x.img ? `<img src="${mkEsc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span><span class="tm"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[x.net]}</span>${scalClock(x.t, true)}</span></button>`;
+    return `<button type="button" class="scal-schip" data-s="${mkEsc(x.net + '|' + x.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}" title="${mkEsc(tip)}" aria-label="${mkEsc(tip)}" onclick="event.stopPropagation();scalStoryOpen('${x.date}','${x.net}','${x.at || ''}')"><span class="scal-sth">${x.img ? `<img src="${mkEsc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span><span class="tm"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[x.net]}</span>${scalClock(x.t, true)}</span></button>`;
   }).join('') + '</div>';
 }
 function scalStoryRow(days, cols) {
@@ -494,7 +501,7 @@ function scalGotStats(d) {
   if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;
   d.rows.forEach(r => {
     if (!r || !SCAL_NETS.includes(r.network) || typeof r.posted_at !== 'string') return;
-    const o = { url: calSafeUrl(r.url) };
+    const o = { url: calSafeUrl(r.url), media: calSafeUrl(r.media_url), isVideo: r.is_video === true };
     SCAL_SFIELDS.forEach(([k]) => { o[k] = scalN(r[k]); });
     scal.sstats[r.network + '|' + r.posted_at] = o;
   });
@@ -507,7 +514,7 @@ function scalStatLines(st) {
 }
 function scalStoryCard(s, cols) {
   const st = scalStatOf(s), c = cols[s.net], cur = scal.sday && scal.sday.at && scal.sday.at === s.at && scal.sday.net === s.net;
-  return `<figure class="scal-story${cur ? ' cur' : ''}" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth">${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+  return `<figure class="scal-story${cur ? ' cur' : ''}" data-s="${mkEsc(s.net + '|' + s.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth"><button type="button" class="scal-splay" aria-label="Watch this story" onclick="event.stopPropagation();scalLbOpenStory(this.closest('[data-s]').dataset.s)">${SCAL_PLAY}</button>${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
     <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')}</b>${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
 }
 function scalStoryTotals(list) {
@@ -521,6 +528,83 @@ function scalStoryCaption() {
     ? '<p class="scal-pcap">Story numbers come from Metricool and show here because you are signed in to the dashboard. Instagram and Facebook do not offer a player for stories, so a story shows as its picture; the link opens it while it is still live, for 24 hours.</p>'
     : '<p class="scal-pcap">Pictures and times only. Story numbers (views, reach, replies, taps) are private, so they are not shown on this page.</p>';
 }
+// The viewer (Kate, 13 Nov 2026): double-click a story or a post (or press the play sign on a story) and it opens in its own window in the Instagram story style:
+// progress bars, the account on top, the picture or video in a tall frame, arrows and the keys left and right to go to the next one without closing it.
+// A story plays as a video only when the dashboard sends its file (media_url). Instagram keeps a story for 24 hours, so older ones are a picture and the viewer says so.
+let scalLb = null;
+const scalByAt = (a, b) => (a.at || '') < (b.at || '') ? -1 : 1;
+function scalFindStory(key) { return Object.values(scalStoryCache).flat().find(x => x.net + '|' + x.at === key) || null; }
+function scalLbOpenStory(key) {
+  const s0 = scalFindStory(key); if (!s0) return;
+  const list = scalStoriesOf(s0.date, s0.net).slice().sort(scalByAt);
+  scalLbStart(list.map(x => ({ k: 'story', s: x })), Math.max(0, list.findIndex(x => x.at === s0.at)));
+}
+function scalLbOpenPost(p) {
+  const list = scalPosts(scalPeriod()).slice().sort(scalByAt).filter(x => x.img || scalEmbedUrl(x));
+  const i = list.findIndex(x => x.id === p.id);
+  if (i < 0) { if (calSafeUrl(p.url)) window.open(calSafeUrl(p.url), '_blank', 'noopener'); return; }
+  scalLbStart(list.map(x => ({ k: 'post', p: x })), i);
+}
+function scalLbStart(items, i) { scalLbStop(); scalLb = { items, i, el: 0, dur: 5000, paused: false, timer: null }; scalLbPaint(); }
+function scalLbStop() { if (scalLb && scalLb.timer) clearInterval(scalLb.timer); }
+function scalLbClose() { scalLbStop(); scalLb = null; const r = document.getElementById('scalLb'); if (r) r.remove(); }
+function scalLbGo(d) {
+  if (!scalLb) return;
+  const n = scalLb.i + d;
+  if (n < 0) return;
+  if (n >= scalLb.items.length) { scalLbClose(); return; }
+  scalLbStop(); scalLb.i = n; scalLb.el = 0; scalLbPaint();
+}
+function scalLbPaint() {
+  const L = scalLb; if (!L) return;
+  let root = document.getElementById('scalLb');
+  if (!root) { root = document.createElement('div'); root.id = 'scalLb'; root.className = 'scal-lb'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Viewer');
+    root.addEventListener('click', e => { if (e.target === root) scalLbClose(); }); document.body.appendChild(root); }
+  const it = L.items[L.i], cols = socCols(), last = L.items.length - 1;
+  let inner = '';
+  if (it.k === 'story') {
+    const s = it.s, st = scalStatOf(s), c = cols[s.net], when = scalClock(s.t) + ', ' + scalShort(s.date);
+    const media = st && st.media && st.isVideo ? `<video src="${mkEsc(st.media)}" autoplay playsinline controls controlsList="nodownload" referrerpolicy="no-referrer"></video>`
+      : (st && st.media ? `<img src="${mkEsc(st.media)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : (s.img ? `<img src="${mkEsc(s.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''));
+    L.video = !!(st && st.media && st.isVideo);
+    inner = `<div class="scal-lbframe story" style="--c:${c};--bf:${scalBadgeFg(c)}">
+      <div class="scal-lbbars">${L.items.map((_, j) => `<i class="${j < L.i ? 'done' : j === L.i ? 'cur' : ''}"><b></b></i>`).join('')}</div>
+      <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span><b>tararosesalon</b><span>${mkEsc(when)}</span></div>
+      <div class="scal-lbmedia">${media}</div>
+      <button type="button" class="scal-lbtap l" aria-label="Previous" onclick="scalLbGo(-1)"></button><button type="button" class="scal-lbtap r" aria-label="Next" onclick="scalLbGo(1)"></button>
+      <div class="scal-lbft">${L.video ? '' : '<div class="scal-lbnote">A picture only: Instagram keeps a story for 24 hours and this one was not saved as a video.</div>'}${st ? scalStatLines(st) : ''}</div></div>`;
+  } else {
+    const p = it.p, e = scalEmbedUrl(p), c = cols[p.net];
+    inner = `<div class="scal-lbframe post" style="--c:${c};--bf:${scalBadgeFg(c)}">
+      <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span><b>${SOC_NETS[p.net]} ${SCAL_KIND[p.kind]}</b><span>${mkEsc(scalClock(p.t))}, ${scalShort(p.date)}</span></div>
+      <div class="scal-lbmedia">${e ? `<iframe src="${mkEsc(e.src)}" title="Play this ${SCAL_KIND[p.kind]}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>` : scalImg(p, false)}</div>
+      <div class="scal-lbft"><div class="scal-lbcap">${scalCap(p)}</div><div>${scalStats(p)}</div>${calSafeUrl(p.url) ? `<a class="scal-slink" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">Open on ${SOC_NETS[p.net]}</a>` : ''}</div></div>`;
+  }
+  root.innerHTML = `<button type="button" class="scal-lbx" aria-label="Close" onclick="scalLbClose()">×</button>
+    <button type="button" class="scal-lbn prev" aria-label="Previous" ${L.i ? '' : 'disabled'} onclick="scalLbGo(-1)">‹</button>${inner}
+    <button type="button" class="scal-lbn next" aria-label="Next" ${L.i < last ? '' : 'disabled'} onclick="scalLbGo(1)">›</button>
+    <div class="scal-lbcount" aria-live="polite">${L.i + 1} of ${L.items.length}</div>`;
+  if (it.k !== 'story') return;
+  // Progress: a picture runs 5 seconds, a video runs its own length; hovering the frame holds it, Space holds it too.
+  const bar = root.querySelector('.scal-lbbars i.cur b'), v = root.querySelector('video'), frame = root.querySelector('.scal-lbframe');
+  if (v) { v.ontimeupdate = () => { if (bar && v.duration) bar.style.width = (100 * v.currentTime / v.duration) + '%'; }; v.onended = () => scalLbGo(1); return; }
+  frame.onmouseenter = () => { L.paused = true; }; frame.onmouseleave = () => { L.paused = false; };
+  L.timer = setInterval(() => { if (L.paused) return; L.el += 50; if (bar) bar.style.width = Math.min(100, 100 * L.el / L.dur) + '%'; if (L.el >= L.dur) scalLbGo(1); }, 50);
+}
+document.addEventListener('keydown', e => {
+  if (!scalLb) return;
+  if (e.key === 'Escape') { e.stopImmediatePropagation(); scalLbClose(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); scalLbGo(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); scalLbGo(-1); }
+  else if (e.key === ' ' && !scalLb.video) { e.preventDefault(); scalLb.paused = !scalLb.paused; }
+}, true);
+document.addEventListener('dblclick', e => {
+  const root = document.getElementById('scalRoot'); if (!root || scalLb) return;
+  const sc = e.target.closest('[data-s]');
+  if (sc && root.contains(sc)) { e.preventDefault(); scalLbOpenStory(sc.dataset.s); return; }
+  const pc = e.target.closest('[data-id]');
+  if (pc && root.contains(pc)) { const p = scalFind(pc.dataset.id); if (p) { e.preventDefault(); scalLbOpenPost(p); } }
+});
 function scalStoryOpen(date, net, at) { scal.sel = null; scal.sday = { date, net, at: at || '' }; scal.focusPanel = true; scalPaint(); }
 function scalStoryPanelHtml(cols) {
   const { date, net } = scal.sday, list = scalStoriesOf(date, net).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1);
@@ -530,7 +614,7 @@ function scalStoryPanelHtml(cols) {
       <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]} stories, ${list.length}</span></div>
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">${list.length ? scalStoryTotals(list) + `<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
-      ${scalStoryCaption()}</div></aside><div class="scal-scrim" onclick="scalClose()"></div>`;
+      ${scalStoryCaption()}</div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────

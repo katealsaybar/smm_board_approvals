@@ -301,3 +301,43 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-tgrid.day .scal-story .scal-sstats{font-size:11px}
 .scal-wcol .scal-story{width:120px;display:inline-block;vertical-align:top;margin:0 6px 6px 0}
 .scal-story.cur .scal-sth{outline:3px solid var(--text);outline-offset:2px}
+
+/* Story play sign and the viewer (Kate, 13 Nov 2026) */
+.scal-sth{position:relative}
+.scal-splay{position:absolute;right:6px;bottom:6px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.scal-splay svg{width:16px;height:16px;fill:currentColor}
+.scal-splay:hover{background:rgba(0,0,0,.85)}
+.scal-story{cursor:pointer}
+.scal-lb{position:fixed;inset:0;z-index:1000;background:rgba(8,8,12,.92);display:flex;align-items:center;justify-content:center;gap:12px;padding:12px}
+.scal-lbframe{position:relative;width:min(380px,calc(100vw - 120px));height:min(88vh,calc((100vw - 120px)*16/9),676px);background:#000;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;color:#fff}
+.scal-lbframe.post{width:min(440px,calc(100vw - 120px));height:min(92vh,760px);background:var(--surface);color:var(--text)}
+.scal-lbbars{position:absolute;z-index:3;left:10px;right:10px;top:8px;display:flex;gap:4px}
+.scal-lbbars i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.35);overflow:hidden;display:block}
+.scal-lbbars i b{display:block;height:100%;width:0;background:#fff}
+.scal-lbbars i.done b{width:100%}
+.scal-lbhd{position:absolute;z-index:3;left:12px;right:12px;top:18px;display:flex;align-items:center;gap:8px;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.scal-lbframe.post .scal-lbhd{position:static;padding:12px 14px;text-shadow:none;border-bottom:1px solid var(--border)}
+.scal-lbhd .scal-bb{width:24px;height:24px;font-size:10px;border-radius:7px;background:var(--c);color:var(--bf)}
+.scal-lbhd span:last-child{opacity:.8;margin-left:2px}
+.scal-lbmedia{position:absolute;inset:0;display:grid;place-items:center}
+.scal-lbframe.post .scal-lbmedia{position:static;flex:1;min-height:0;overflow:auto;background:var(--surface2)}
+.scal-lbmedia img,.scal-lbmedia video{width:100%;height:100%;object-fit:contain;background:#000}
+.scal-lbmedia iframe{width:100%;height:100%;min-height:520px;border:0;background:#fff}
+.scal-lbtap{position:absolute;z-index:2;top:50px;bottom:90px;width:32%;border:0;background:none;cursor:pointer;padding:0}
+.scal-lbtap.l{left:0}.scal-lbtap.r{right:0}
+.scal-lbft{position:absolute;z-index:3;left:0;right:0;bottom:0;padding:34px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-size:12.5px;display:flex;flex-direction:column;gap:6px}
+.scal-lbframe.post .scal-lbft{position:static;background:none;padding:10px 14px 14px;border-top:1px solid var(--border)}
+.scal-lbft .scal-sstats{grid-template-columns:1fr 1fr 1fr;gap:2px 10px;font-size:12px}
+.scal-lbft .scal-sstats dt{color:rgba(255,255,255,.7)}
+.scal-lbft .scal-sstats dd{color:#fff}
+.scal-lbnote{font-size:12px;opacity:.85}
+.scal-lbcap{font-size:13px;line-height:1.4;max-height:9em;overflow:auto;white-space:pre-wrap}
+.scal-lbx{position:absolute;top:12px;right:14px;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:4}
+.scal-lbn{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:28px;line-height:1;cursor:pointer}
+.scal-lbn:disabled{opacity:.25;cursor:default}
+.scal-lbn:hover:not(:disabled),.scal-lbx:hover{background:rgba(255,255,255,.3)}
+.scal-lbcount{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.7);pointer-events:none}
+@media(max-width:560px){.scal-lbn{position:absolute;bottom:14px;width:40px;height:40px}.scal-lbn.prev{left:14px}.scal-lbn.next{right:14px}.scal-lbframe,.scal-lbframe.post{width:calc(100vw - 16px);height:min(80vh,760px)}}
+
+/* The whole caption is read inside the window (Kate, 13 Nov 2026): the player's own 'See more' leaves for Facebook or Instagram. */
+.scal-pcap.full{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
