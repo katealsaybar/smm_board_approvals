@@ -84,7 +84,7 @@ const SCAL_KIND = { reel: 'reel', post: 'post', video: 'video', photo: 'photo po
 const SCAL_VIEWS = ['day', 'week', 'month', 'list'];
 const SCAL_MONTHS_NAMED = { '2025-01': 'January 2025', '2025-08': 'August 2025', '2026-06': 'June 2026' };
 
-const scal = { view: 'week', src: 'all', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, pstats: {}, pasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
+const scal = { view: 'week', src: 'all', kinds: { post: true, carousel: true, reel: true }, fopen: false, ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, pstats: {}, pasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
 const scalCache = {};            // 'YYYY-MM' -> [post]
 let scalSnaps = null, scalSync = null;
 try {
@@ -92,10 +92,11 @@ try {
   if (SCAL_VIEWS.includes(s.view)) scal.view = s.view;
   scal.stories = s.stories === true;
   if (['all', 'manual', 'metricool'].includes(s.src)) scal.src = s.src;
+  if (s.kinds) ['post', 'carousel', 'reel'].forEach(k => { if (typeof s.kinds[k] === 'boolean') scal.kinds[k] = s.kinds[k]; });
   if (s.on) SCAL_NETS.forEach(n => { if (typeof s.on[n] === 'boolean') scal.on[n] = s.on[n]; });
   if (!SCAL_NETS.some(n => scal.on[n])) SCAL_NETS.forEach(n => { scal.on[n] = true; });
 } catch (e) {}
-const scalSave = () => { try { localStorage.setItem('trs-approvals-scal', JSON.stringify({ view: scal.view, on: scal.on, stories: scal.stories, src: scal.src })); } catch (e) {} };
+const scalSave = () => { try { localStorage.setItem('trs-approvals-scal', JSON.stringify({ view: scal.view, on: scal.on, stories: scal.stories, src: scal.src, kinds: scal.kinds })); } catch (e) {} };
 
 // ── Dates (all Dubai days, as ISO strings) ────────────────────────────────────────
 const scalToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
@@ -167,7 +168,9 @@ function scalPeriod() {
   }
   return { kind: 'month', from: scal.month + '-01', to: scalMonthEnd(scal.month), label: scalMonthName(scal.month), months: [scal.month] };
 }
-const scalPosts = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to && scal.on[p.net] && (scal.src === 'all' || p.source === scal.src));
+const scalKindKey = p => p.kind === 'carousel' ? 'carousel' : (p.kind === 'reel' || p.kind === 'video') ? 'reel' : 'post';
+const scalPostsRaw = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to);
+const scalPosts = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to && scal.on[p.net] && scal.kinds[scalKindKey(p)] && (scal.src === 'all' || p.source === scal.src));
 const scalFind = id => { for (const k in scalCache) { const f = scalCache[k].find(p => p.id === id); if (f) return f; } return null; };
 
 function scalEdges(per, today) {
@@ -231,17 +234,14 @@ function scalPaint() {
   const stale = !scalSync || !scalSync.last_ok_at;
   const synced = scalSync && scalSync.last_ok_at ? new Date(scalSync.last_ok_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
-  const chips = `<button type="button" class="scal-plat all" aria-pressed="${allOn}" onclick="scalPlat('all')">Show all</button>` +
-    SCAL_NETS.map(n => `<button type="button" class="scal-plat" style="--c:${cols[n]};--bf:${scalBadgeFg(cols[n])}" aria-pressed="${!!scal.on[n]}" onclick="scalPlat('${n}')"><span class="scal-b" aria-hidden="true">${SCAL_CODE[n]}</span>${SOC_NETS[n]}</button>`).join('') +
-    scalStoriesChip(cols) + `<span class="scal-plat off" title="YouTube is not on the calendar yet. Metricool gives us daily totals for it, not a list of videos."><span class="scal-b" aria-hidden="true">YT</span>YouTube <em>not yet</em></span>`;
-
-  const srcBtns = [['all', 'Everything'], ['manual', 'Manual'], ['metricool', 'Scheduled']].map(([k, l]) => `<button type="button" class="${scal.src === k ? 'on' : ''}" aria-pressed="${scal.src === k}" onclick="scalSrc('${k}')">${l}</button>`).join('');
+  const srcBtns = [['all', 'Everything'], ['manual', 'Posted by hand'], ['metricool', 'Scheduled in Metricool']].map(([k, l]) => `<button type="button" class="${scal.src === k ? 'on' : ''}" aria-pressed="${scal.src === k}" data-f="src-${k}" onclick="scalSrc('${k}');scalFocus('src-${k}')">${l}</button>`).join('');
   let answer;
   if (scal.busy && !posts.length) answer = 'Loading the posts…';
   else if (scal.err) answer = 'The posts did not load. Refresh to try again.';
   else if (!posts.length) answer = `No posts in <b>${mkEsc(per.label)}</b> with these platforms.`;
   else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.likes)} likes.${scalSrcNote(posts)}${scalStoryNote(per)}`;
 
+  const filterBar = scalFilterBar(cols, per);
   const hint = nOn === 1 ? 'Showing one platform. Tap another to add it.' : allOn ? 'Showing everything. Tap one platform to see just that one.' : `Showing ${nOn} platforms together, one colour each.`;
   const viewBtns = [['day', 'Daily'], ['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([k, l]) => `<button type="button" class="${scal.view === k ? 'on' : ''}" aria-pressed="${scal.view === k}" onclick="scalView('${k}')">${l}</button>`).join('');
 
@@ -260,10 +260,8 @@ function scalPaint() {
         <button type="button" class="sc-btn" onclick="scalToToday()">Today</button>
         <div class="sc-seg scal-seg" role="group" aria-label="View">${viewBtns}</div>
       </div>
-      <div class="scal-plats" role="group" aria-label="Platforms">${chips}</div>
-      <div class="scal-srcbar"><span class="scal-srclbl">Posted</span><div class="sc-seg scal-seg" role="group" aria-label="How it was posted">${srcBtns}</div></div>
     </div>
-    <p class="scal-hint">${hint}</p>
+    ${filterBar}
     <section class="scal-answer" aria-live="polite"><div>${answer}</div><div class="scal-actions">${best ? `<button type="button" class="sc-btn primary" data-id="${mkEsc(best.id)}" onclick="scalOpen(this.dataset.id)">See that post</button>` : ''}${posts.length ? `<button type="button" class="sc-btn" onclick="scalDownload('xlsx')">Download XLSX</button><button type="button" class="sc-btn" onclick="scalDownload('csv')">Download CSV</button>` : ''}</div></section>
     ${late.length ? `<p class="scal-note">${late.map(n => `${SOC_NETS[n]} has no posts on record before ${SCAL_MONTHS_NAMED[SCAL_START[n]] || SCAL_START[n]}`).join('. ')}.</p>` : ''}
     <div class="scal-layout${scal.sel || scal.sday ? ' open' : ''}">
@@ -403,6 +401,44 @@ function scalScrimClick(e) {
   const el = document.elementFromPoint(x, y), b = el && el.closest('button,[onclick]');
   if (b && b.closest('.scal-cal') && !b.closest('.scal-panel')) b.click();
 }
+// Filters (Kate, 13 Nov 2026, option A of docs/mockups/content-calendar-filters-v2.html): one button, its panel asks Where (platform), What (kind of content) and How it was posted,
+// and what was chosen shows as tags under it. The number on the button is how many things are hidden or narrowed. Stories are off until ticked, as before.
+function scalFocus(id) { const el = document.querySelector('[data-f="' + id + '"]'); if (el) el.focus(); }
+function scalFilterBar(cols, per) {
+  const raw = scalPostsRaw(per);
+  const KINDS = [['post', 'Posts'], ['carousel', 'Carousels'], ['reel', 'Reels and videos']];
+  const nHidden = SCAL_NETS.filter(n => !scal.on[n]).length + KINDS.filter(([k]) => !scal.kinds[k]).length + (scal.src !== 'all' ? 1 : 0);
+  const storyN = per.months.flatMap(m => scalStoryCache[m] || []).filter(x => x.date >= per.from && x.date <= per.to).length;
+  const opt = (id, checked, click, dot, label, count, extra) => `<label class="scal-opt"><input type="checkbox" data-f="${id}" ${checked ? 'checked' : ''} onchange="${click}">${dot ? `<span class="scal-od" style="--c:${dot}"></span>` : ''}${label}${count !== '' ? ` <span class="scal-oc">${count}</span>` : ''}${extra || ''}</label>`;
+  const where = SCAL_NETS.map(n => opt('p-' + n, scal.on[n], `scalPlatSet('${n}',this.checked)`, cols[n], SOC_NETS[n], raw.filter(p => p.net === n).length)).join('')
+    + `<label class="scal-opt na"><input type="checkbox" disabled><span class="scal-od" style="--c:var(--muted2)"></span>YouTube <span class="scal-soon" title="Metricool gives us daily totals for YouTube, not a list of videos.">Not yet</span></label>`;
+  const what = KINDS.map(([k, l]) => opt('k-' + k, scal.kinds[k], `scalKindSet('${k}',this.checked)`, '', l, raw.filter(p => scalKindKey(p) === k).length)).join('')
+    + opt('k-story', scal.stories, `scalStoriesSet(this.checked)`, '', 'Stories', scal.stories ? storyN : '');
+  const srcBtns = [['all', 'Everything'], ['manual', 'Posted by hand'], ['metricool', 'Scheduled in Metricool']].map(([k, l]) => `<button type="button" aria-pressed="${scal.src === k}" data-f="src-${k}" onclick="scalSrc('${k}');scalFocus('src-${k}')">${l}</button>`).join('');
+  const tags = [];
+  SCAL_NETS.filter(n => !scal.on[n]).forEach(n => tags.push(`<span class="scal-tag">Hiding ${SOC_NETS[n]}<button type="button" aria-label="Show ${SOC_NETS[n]}" onclick="scalPlatSet('${n}',true)">×</button></span>`));
+  KINDS.filter(([k]) => !scal.kinds[k]).forEach(([k, l]) => tags.push(`<span class="scal-tag">Hiding ${l.toLowerCase()}<button type="button" aria-label="Show ${l}" onclick="scalKindSet('${k}',true)">×</button></span>`));
+  if (scal.src !== 'all') tags.push(`<span class="scal-tag">${scal.src === 'manual' ? 'Posted by hand only' : 'Scheduled in Metricool only'}<button type="button" aria-label="Remove" onclick="scalSrc('all')">×</button></span>`);
+  if (scal.stories) tags.push(`<span class="scal-tag">Stories shown<button type="button" aria-label="Hide stories" onclick="scalStoriesSet(false)">×</button></span>`);
+  return `<div class="scal-fbar"><span class="scal-srclbl">Show</span>
+    <div class="scal-fwrap"><button type="button" class="scal-fbtn" aria-expanded="${scal.fopen}" aria-haspopup="true" onclick="scalFToggle()">Filters${nHidden ? `<span class="scal-fn">${nHidden}</span>` : ''}</button>
+      <div class="scal-fpanel${scal.fopen ? ' open' : ''}" role="group" aria-label="Filters">
+        <div class="scal-fsec"><h4>Where</h4><div class="scal-opts">${where}</div></div>
+        <div class="scal-fsec"><h4>What</h4><div class="scal-opts">${what}</div></div>
+        <div class="scal-fsec"><h4>How it was posted</h4><div class="sc-seg scal-seg">${srcBtns}</div></div>
+        <div class="scal-ffoot"><button type="button" class="scal-fclear" onclick="scalClearFilters()">Clear all filters</button><button type="button" class="scal-fdone" onclick="scalFToggle()">Done</button></div>
+      </div></div>
+    <div class="scal-ftags">${tags.join('')}${nHidden ? '<button type="button" class="scal-fclear" onclick="scalClearFilters()">Clear all</button>' : ''}</div></div>`;
+}
+function scalFToggle() { scal.fopen = !scal.fopen; scalPaint(); if (scal.fopen) { const f = document.querySelector('.scal-fpanel input:not([disabled])'); if (f) f.focus(); } }
+function scalPlatSet(n, v) {
+  if (!v && SCAL_NETS.filter(x => scal.on[x]).length === 1) { scalPaint(); return; }
+  scal.on[n] = v; scal.sel = null; scalSave(); scalPaint(); scalFocus('p-' + n);
+}
+function scalKindSet(k, v) { scal.kinds[k] = v; scal.sel = null; scalSave(); scalPaint(); scalFocus('k-' + k); }
+function scalStoriesSet(v) { if (!!scal.stories !== !!v) scalToggleStories(); else scalPaint(); scalFocus('k-story'); }
+function scalClearFilters() { SCAL_NETS.forEach(n => { scal.on[n] = true; }); scal.kinds = { post: true, carousel: true, reel: true }; scal.src = 'all'; scal.sel = null; scalSave(); scalPaint(); }
+document.addEventListener('click', e => { if (scal.fopen && !e.target.closest('.scal-fwrap')) { scal.fopen = false; scalPaint(); } });
 function scalPlat(n) {
   const allOn = SCAL_NETS.every(x => scal.on[x]);
   if (n === 'all') SCAL_NETS.forEach(x => { scal.on[x] = true; });
@@ -440,7 +476,7 @@ function scalSearch(v) {
 function scalSortBy(v) { scal.sort = v; scalPaint(); }
 
 // The page redraws for a theme change through socRepaint; the colours are read at draw time, so nothing else is needed here.
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && (scal.sel || scal.sday) && document.getElementById('scalRoot')) scalClose(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && scal.fopen) { scal.fopen = false; scalPaint(); scalFocus('x'); return; } if (e.key === 'Escape' && (scal.sel || scal.sday) && document.getElementById('scalRoot')) scalClose(); });
 
 
 // ──────────────────────────────────────────────────────────────────────────────────────
