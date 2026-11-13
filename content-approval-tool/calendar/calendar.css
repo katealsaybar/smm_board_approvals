@@ -114,7 +114,6 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-note{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--surface2);color:var(--muted);font-size:14.5px}
 
 .scal-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
-@media(min-width:1100px){.scal-layout.open{grid-template-columns:minmax(0,1fr) 380px}}
 .scal-cal{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0}
 .scal-empty{font-size:13.5px;color:var(--muted2);padding:4px 2px}
 
@@ -153,9 +152,6 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-tc .scal-bb{width:18px;height:18px;font-size:9.5px;border-radius:5px}
 .scal-tc .scal-cp{font-size:12.5px;line-height:1.25;color:var(--muted)}
 .scal-tc .scal-st{font-size:12px}
-.scal-layout.open .scal-tc{grid-template-columns:minmax(0,1fr)}
-.scal-layout.open .scal-tc .scal-th{display:none}
-.scal-layout.open .scal-tc .scal-r1,.scal-layout.open .scal-tc .scal-cp,.scal-layout.open .scal-tc .scal-st{grid-column:1}
 .scal-wstack{display:none}
 
 /* Month */
@@ -209,8 +205,11 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-lrow .n{font-weight:600;font-variant-numeric:tabular-nums}
 
 /* Side panel (a sheet from the bottom on a phone) */
-.scal-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow-y:auto;position:sticky;top:12px;max-height:calc(100vh - 24px)}
-.scal-scrim{display:none}
+/* The post or story details are a pop-up window over the calendar (Kate, 13 Nov 2026), not a column beside it, so the calendar keeps its whole width. */
+.scal-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow-y:auto;position:fixed;z-index:900;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 24px));max-height:90vh;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+.scal-panel[aria-label="Stories"]{width:min(780px,calc(100vw - 24px))}
+.scal-panel .scal-ph{position:sticky;top:0;background:var(--surface);z-index:1}
+.scal-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:890}
 .scal-ph{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
 .scal-ph .scal-b{flex:none;width:32px;height:32px;border-radius:9px;background:var(--c);color:var(--bf);font-weight:700;font-size:12px;display:grid;place-items:center}
 .scal-ph .when{flex:1;min-width:0}
@@ -258,10 +257,6 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
   .scal-lrow .mini{display:block}
   .scal-lrow .d{display:flex;gap:8px;align-items:baseline}
   .scal-month h3{font-size:20px;min-width:0}
-}
-@media(max-width:1099px){
-  .scal-panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:86vh;border-radius:18px 18px 0 0;z-index:900}
-  .scal-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:890}
 }
 @media(prefers-reduced-motion:reduce){.scal *{scroll-behavior:auto!important;transition:none!important}}
 
