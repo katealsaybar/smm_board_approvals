@@ -294,3 +294,15 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-stot .scal-sstats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:2px 14px;font-size:13px}
 .scal-snone{font-size:12px;color:var(--muted)}
 .scal-slink{font-size:12px;color:var(--muted);text-decoration:underline}
+
+/* Stories placed by the hour they went up (Kate, 13 Nov 2026) */
+.scal-schips{display:flex;flex-wrap:wrap;gap:4px}
+.scal-schip{display:flex;flex-direction:column;align-items:center;gap:2px;width:42px;padding:0;border:0;background:none;cursor:pointer}
+.scal-schip .scal-sth{width:34px;border-radius:6px;outline:2px solid var(--c);outline-offset:-2px}
+.scal-schip:hover .scal-sth{box-shadow:0 0 0 2px var(--text)}
+.scal-schip .tm{display:flex;align-items:center;gap:2px;font-size:10px;line-height:1;color:var(--muted);white-space:nowrap}
+.scal-schip .scal-bb{width:12px;height:12px;font-size:6.5px;border-radius:3px;flex:none}
+.scal-tgrid.day .scal-story{width:104px;flex:none}
+.scal-tgrid.day .scal-story .scal-sstats{font-size:11px}
+.scal-wcol .scal-story{width:120px;display:inline-block;vertical-align:top;margin:0 6px 6px 0}
+.scal-story.cur .scal-sth{outline:3px solid var(--text);outline-offset:2px}

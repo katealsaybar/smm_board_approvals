@@ -265,13 +265,15 @@ function scalPaint() {
 function scalWeekHtml(posts, cols, per, today) {
   const best = scalBest(), days = Array.from({ length: 7 }, (_, i) => scalAdd(per.from, i));
   const known = posts.filter(p => p.t), unknown = posts.filter(p => !p.t);
-  const hrs = known.map(p => p.t.h), h0 = Math.min(8, ...hrs), h1 = Math.max(22, ...hrs);
+  // Stories (Kate, 13 Nov 2026): each one is placed in the hour it was uploaded, so the day reads in order. Not one row of them under the header.
+  const stor = scal.stories ? days.flatMap(d => scalStoriesOf(d)) : [], sKnown = stor.filter(x => x.t), sUnknown = stor.filter(x => !x.t);
+  const hrs = known.map(p => p.t.h).concat(sKnown.map(x => x.t.h)), h0 = Math.min(8, ...hrs), h1 = Math.max(22, ...hrs);
   const cell = {}; known.forEach(p => { (cell[p.date + '|' + p.t.h] = cell[p.date + '|' + p.t.h] || []).push(p); });
+  const scell = {}; sKnown.forEach(x => { (scell[x.date + '|' + x.t.h] = scell[x.date + '|' + x.t.h] || []).push(x); });
   let g = '<div class="scal-dh c0"></div>' + days.map(d => `<div class="scal-dh${d === today ? ' today' : ''}"><b>${mkD(d).toLocaleDateString('en-GB', { weekday: 'short' })}</b><span class="n">${mkD(d).getDate()}</span></div>`).join('');
-  if (unknown.length) g += '<div class="scal-hl">Time not known</div>' + days.map(d => `<div class="scal-hc l0">${unknown.filter(p => p.date === d).map(p => scalTile(p, cols, 'tc')).join('')}</div>`).join('');
-  if (scal.stories) g += scalStoryRow(days, cols);
+  if (unknown.length || sUnknown.length) g += '<div class="scal-hl">Time not known</div>' + days.map(d => `<div class="scal-hc l0">${unknown.filter(p => p.date === d).map(p => scalTile(p, cols, 'tc')).join('')}${scalStoryChips(sUnknown.filter(x => x.date === d), cols)}</div>`).join('');
   for (let h = h0; h <= h1; h++) {
-    g += `<div class="scal-hl">${scalHour(h)}</div>` + days.map((d, i) => `<div class="scal-hc l${best ? best(i, h) : 0}">${(cell[d + '|' + h] || []).map(p => scalTile(p, cols, 'tc')).join('')}</div>`).join('');
+    g += `<div class="scal-hl">${scalHour(h)}</div>` + days.map((d, i) => `<div class="scal-hc l${best ? best(i, h) : 0}">${(cell[d + '|' + h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${scalStoryChips(scell[d + '|' + h] || [], cols)}</div>`).join('');
   }
   // Phone: one block a day, no hour grid.
   const stacked = days.map(d => { const list = posts.filter(p => p.date === d);
@@ -284,16 +286,20 @@ function scalWeekHtml(posts, cols, per, today) {
 function scalDayHtml(posts, cols, per, today) {
   const d = per.from, best = scalBest(), dow = (mkD(d).getDay() + 6) % 7;
   const known = posts.filter(p => p.t), unknown = posts.filter(p => !p.t);
-  const stories = scalStoriesOf(d).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1);
-  const stHtml = scal.stories ? `<div class="scal-dstories"><div class="scal-sec">Stories${stories.length ? ', ' + stories.length : ''}</div>${stories.length ? scalStoryTotals(stories) + '<div class="scal-sgrid row">' + stories.map(s => scalStoryCard(s, cols)).join('') + '</div>' : '<div class="scal-empty">No stories this day.</div>'}${scalStoryCaption()}</div>` : '';
-  if (!posts.length) return stHtml + `<div class="scal-empty" style="padding:20px 4px">${d > today ? 'Not yet.' : 'No posts this day with these platforms.'}</div>`;
-  const hrs = known.map(p => p.t.h), h0 = Math.min(8, ...hrs), h1 = Math.max(22, ...hrs);
-  const cell = {}; known.forEach(p => { (cell[p.t.h] = cell[p.t.h] || []).push(p); });
+  const stories = scalStoriesOf(d).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1), sKnown = stories.filter(x => x.t), sUnknown = stories.filter(x => !x.t);
+  const head = scal.stories ? (stories.length ? `<div class="scal-dstories">${scalStoryTotals(stories)}</div>` : '') : '';
+  if (!posts.length && !stories.length) return `<div class="scal-empty" style="padding:20px 4px">${d > today ? 'Not yet.' : 'No posts this day with these platforms.'}</div>`;
+  const hrs = known.map(p => p.t.h).concat(sKnown.map(x => x.t.h)), h0 = Math.min(8, ...hrs), h1 = Math.max(22, ...hrs);
+  const cell = {}, scell = {};
+  known.forEach(p => { (cell[p.t.h] = cell[p.t.h] || []).push(p); });
+  sKnown.forEach(x => { (scell[x.t.h] = scell[x.t.h] || []).push(x); });
   let g = '';
-  if (unknown.length) g += '<div class="scal-hl">Time not known</div><div class="scal-hc l0">' + unknown.map(p => scalTile(p, cols, 'tc')).join('') + '</div>';
-  for (let h = h0; h <= h1; h++) g += `<div class="scal-hl">${scalHour(h)}</div><div class="scal-hc l${best ? best(dow, h) : 0}">${(cell[h] || []).map(p => scalTile(p, cols, 'tc')).join('')}</div>`;
-  const stacked = `<div class="scal-wcol${d === today ? ' today' : ''}">${posts.map(p => scalTile(p, cols, 'wc')).join('')}</div>`;
-  return `${stHtml}<div class="scal-tgrid day">${g}</div><div class="scal-wstack">${stacked}</div>`;
+  if (unknown.length || sUnknown.length) g += '<div class="scal-hl">Time not known</div><div class="scal-hc l0">' + unknown.map(p => scalTile(p, cols, 'tc')).join('') + sUnknown.map(x => scalStoryCard(x, cols)).join('') + '</div>';
+  for (let h = h0; h <= h1; h++) g += `<div class="scal-hl">${scalHour(h)}</div><div class="scal-hc l${best ? best(dow, h) : 0}">${(cell[h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${(scell[h] || []).map(x => scalStoryCard(x, cols)).join('')}</div>`;
+  // Phone: the day in time order, posts and stories mixed, no hour grid.
+  const mixed = posts.map(p => ({ at: p.at || p.date, html: scalTile(p, cols, 'wc') })).concat(stories.map(x => ({ at: x.at || x.date, html: scalStoryCard(x, cols) }))).sort((a, b) => a.at < b.at ? -1 : 1);
+  const stacked = `<div class="scal-wcol${d === today ? ' today' : ''}">${mixed.map(m => m.html).join('')}</div>`;
+  return `${head}<div class="scal-tgrid day">${g}</div><div class="scal-wstack">${stacked}</div>${scal.stories ? scalStoryCaption() : ''}`;
 }
 
 // Month: a pill a post for two or more platforms, a picture a post for one. On a phone, dots and the chosen day's list underneath.
@@ -451,6 +457,14 @@ function scalStoryPills(date, cols) {
     return `<button type="button" class="scal-spill" style="--c:${cols[n]};--bf:${scalBadgeFg(cols[n])}" onclick="event.stopPropagation();scalStoryOpen('${date}','${n}')" aria-label="${SOC_NETS[n]} stories on ${scalLong(date)}, ${k}"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[n]}</span>${k} ${k === 1 ? 'story' : 'stories'}</button>`;
   }).join('');
 }
+// A story in the week grid: a small picture and its time, in the hour it went up. It opens that day's stories for the network, with this one marked.
+function scalStoryChips(list, cols) {
+  if (!list.length) return '';
+  return '<div class="scal-schips">' + list.slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1).map(x => {
+    const c = cols[x.net], st = scalStatOf(x), tip = SOC_NETS[x.net] + ' story, ' + (scalClock(x.t) || 'time not known') + (st && st.views != null ? ', ' + scalFmt(st.views) + ' views' : '');
+    return `<button type="button" class="scal-schip" style="--c:${c};--bf:${scalBadgeFg(c)}" title="${mkEsc(tip)}" aria-label="${mkEsc(tip)}" onclick="event.stopPropagation();scalStoryOpen('${x.date}','${x.net}','${x.at || ''}')"><span class="scal-sth">${x.img ? `<img src="${mkEsc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span><span class="tm"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[x.net]}</span>${scalClock(x.t, true)}</span></button>`;
+  }).join('') + '</div>';
+}
 function scalStoryRow(days, cols) {
   return '<div class="scal-hl">Stories</div>' + days.map(d => `<div class="scal-hc l0">${scalStoryPills(d, cols)}</div>`).join('');
 }
@@ -492,8 +506,8 @@ function scalStatLines(st) {
   return items ? `<dl class="scal-sstats">${items}</dl>` : '';
 }
 function scalStoryCard(s, cols) {
-  const st = scalStatOf(s), c = cols[s.net];
-  return `<figure class="scal-story" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth">${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+  const st = scalStatOf(s), c = cols[s.net], cur = scal.sday && scal.sday.at && scal.sday.at === s.at && scal.sday.net === s.net;
+  return `<figure class="scal-story${cur ? ' cur' : ''}" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth">${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
     <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')}</b>${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
 }
 function scalStoryTotals(list) {
@@ -507,7 +521,7 @@ function scalStoryCaption() {
     ? '<p class="scal-pcap">Story numbers come from Metricool and show here because you are signed in to the dashboard. Instagram and Facebook do not offer a player for stories, so a story shows as its picture; the link opens it while it is still live, for 24 hours.</p>'
     : '<p class="scal-pcap">Pictures and times only. Story numbers (views, reach, replies, taps) are private, so they are not shown on this page.</p>';
 }
-function scalStoryOpen(date, net) { scal.sel = null; scal.sday = { date, net }; scal.focusPanel = true; scalPaint(); }
+function scalStoryOpen(date, net, at) { scal.sel = null; scal.sday = { date, net, at: at || '' }; scal.focusPanel = true; scalPaint(); }
 function scalStoryPanelHtml(cols) {
   const { date, net } = scal.sday, list = scalStoriesOf(date, net).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1);
   const tiles = list.map(s => scalStoryCard(s, cols)).join('');
