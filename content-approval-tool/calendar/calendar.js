@@ -425,7 +425,7 @@ function scalFilterBar(cols, per) {
       <div class="scal-fpanel${scal.fopen ? ' open' : ''}" role="group" aria-label="Filters">
         <div class="scal-fsec"><h4>Where</h4><div class="scal-opts">${where}</div></div>
         <div class="scal-fsec"><h4>What</h4><div class="scal-opts">${what}</div></div>
-        <div class="scal-fsec"><h4>How it was posted</h4><div class="sc-seg scal-seg">${srcBtns}</div></div>
+        <div class="scal-fsec"><h4>How it was posted</h4><div class="sc-seg scal-seg">${srcBtns}</div><p class="scal-fhint">Stories are posted live in the app, so they count as posted by hand.</p></div>
         <div class="scal-ffoot"><button type="button" class="scal-fclear" onclick="scalClearFilters()">Clear all filters</button><button type="button" class="scal-fdone" onclick="scalFToggle()">Done</button></div>
       </div></div>
     <div class="scal-ftags">${tags.join('')}${nHidden ? '<button type="button" class="scal-fclear" onclick="scalClearFilters()">Clear all</button>' : ''}</div></div>`;
@@ -503,7 +503,7 @@ async function scalEnsureStories() {
 // The posts first (as before), then the stories when the chip is on.
 async function scalEnsure() { await scalEnsurePosts(); await scalEnsureStories(); scalAskPostStats(); }
 
-const scalStoriesOf = (date, net) => scal.stories ? (scalStoryCache[date.slice(0, 7)] || []).filter(s => s.date === date && scal.on[s.net] && (!net || s.net === net)) : [];
+const scalStoriesOf = (date, net) => scal.stories ? (scalStoryCache[date.slice(0, 7)] || []).filter(s => s.date === date && scal.on[s.net] && (!net || s.net === net) && (scal.src === 'all' || scal.src === 'manual')) : [];
 function scalStoriesChip(cols) {
   return `<button type="button" class="scal-plat" style="--c:#B7791F;--bf:#FFFFFF" aria-pressed="${!!scal.stories}" onclick="scalToggleStories()" title="Stories: a picture and the time, no numbers"><span class="scal-b" aria-hidden="true">ST</span>Stories</button>`;
 }
@@ -519,8 +519,8 @@ function scalStoryPills(date, cols) {
 function scalStoryChips(list, cols) {
   if (!list.length) return '';
   return '<div class="scal-schips">' + list.slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1).map(x => {
-    const c = cols[x.net], st = scalStatOf(x), tip = SOC_NETS[x.net] + ' story, ' + (scalClock(x.t) || 'time not known') + (st && st.views != null ? ', ' + scalFmt(st.views) + ' views' : '');
-    return `<button type="button" class="scal-schip" data-s="${mkEsc(x.net + '|' + x.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}" title="${mkEsc(tip)}" aria-label="${mkEsc(tip)}" onclick="event.stopPropagation();scalStoryOpen('${x.date}','${x.net}','${x.at || ''}')"><span class="scal-sth">${x.img ? `<img src="${mkEsc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span><span class="tm"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[x.net]}</span>${scalClock(x.t, true)}</span></button>`;
+    const c = cols[x.net], st = scalStatOf(x), tip = SOC_NETS[x.net] + ' story (posted by hand), ' + (scalClock(x.t) || 'time not known') + (st && st.views != null ? ', ' + scalFmt(st.views) + ' views' : '');
+    return `<button type="button" class="scal-schip" data-s="${mkEsc(x.net + '|' + x.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}" title="${mkEsc(tip)}" aria-label="${mkEsc(tip)}" onclick="event.stopPropagation();scalStoryOpen('${x.date}','${x.net}','${x.at || ''}')"><span class="scal-sth">${x.img ? `<img src="${mkEsc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span><span class="tm"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[x.net]}</span>${scalClock(x.t, true)}<span class="scal-sd" aria-hidden="true"></span></span></button>`;
   }).join('') + '</div>';
 }
 function scalStoryRow(days, cols) {
@@ -580,7 +580,7 @@ function scalGotStats(d) {
   if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;
   d.rows.forEach(r => {
     if (!r || !SCAL_NETS.includes(r.network) || typeof r.posted_at !== 'string') return;
-    const o = { url: calSafeUrl(r.url), media: calSafeUrl(r.media_url), isVideo: r.is_video === true };
+    const o = { url: calSafeUrl(r.url), media: calSafeUrl(r.media_url), isVideo: r.is_video === true, noFile: r.no_file === true };
     SCAL_SFIELDS.forEach(([k]) => { o[k] = scalN(r[k]); });
     scal.sstats[r.network + '|' + r.posted_at] = o;
   });
@@ -594,7 +594,7 @@ function scalStatLines(st) {
 function scalStoryCard(s, cols) {
   const st = scalStatOf(s), c = cols[s.net], cur = scal.sday && scal.sday.at && scal.sday.at === s.at && scal.sday.net === s.net;
   return `<figure class="scal-story${cur ? ' cur' : ''}" data-s="${mkEsc(s.net + '|' + s.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth"><button type="button" class="scal-splay" aria-label="Watch this story" onclick="event.stopPropagation();scalLbOpenStory(this.closest('[data-s]').dataset.s)">${SCAL_PLAY}</button>${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
-    <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')}</b>${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
+    <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')} ${scalSrcBadge({ source: 'manual' })}</b>${st && st.noFile ? `<span class="scal-snone">Picture only: ${SOC_NETS[s.net]} gave no video file</span>` : ''}${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
 }
 function scalStoryTotals(list) {
   const tot = {}, got = list.map(scalStatOf).filter(Boolean);
@@ -651,7 +651,7 @@ function scalLbPaint() {
       <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span><b>tararosesalon</b><span>${mkEsc(when)}</span></div>
       <div class="scal-lbmedia">${media}</div>
       <button type="button" class="scal-lbtap l" aria-label="Previous" onclick="scalLbGo(-1)"></button><button type="button" class="scal-lbtap r" aria-label="Next" onclick="scalLbGo(1)"></button>
-      <div class="scal-lbft">${L.video ? '' : '<div class="scal-lbnote">A picture only: Instagram keeps a story for 24 hours and this one was not saved as a video.</div>'}${st ? scalStatLines(st) : ''}</div></div>`;
+      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}</div></div>`;
   } else {
     const p = it.p, e = scalEmbedUrl(p), c = cols[p.net];
     inner = `<div class="scal-lbframe post" style="--c:${c};--bf:${scalBadgeFg(c)}">
@@ -690,7 +690,7 @@ function scalStoryPanelHtml(cols) {
   const tiles = list.map(s => scalStoryCard(s, cols)).join('');
   return `<aside class="scal-panel" role="dialog" aria-label="Stories" style="--c:${cols[net]};--bf:${scalBadgeFg(cols[net])}">
     <div class="scal-ph"><span class="scal-b" aria-hidden="true">${SCAL_CODE[net]}</span>
-      <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]} stories, ${list.length}</span></div>
+      <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]} stories, ${list.length} ${scalSrcBadge({ source: 'manual' })}</span></div>
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">${list.length ? scalStoryTotals(list) + `<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
       ${scalStoryCaption()}</div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
