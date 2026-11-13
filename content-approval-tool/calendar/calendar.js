@@ -41,6 +41,8 @@ if (calEmbedded) {
     if (e.data.type === 'trs-theme' && (e.data.theme === 'dark' || e.data.theme === 'light')) {
       document.documentElement.setAttribute('data-theme', e.data.theme);
       if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
+    } else if (e.data.type === 'trs-cal-post-stats' && typeof scal !== 'undefined') {
+      scalGotPostStats(e.data);
     } else if (e.data.type === 'trs-cal-stories' && typeof scal !== 'undefined') {
       scalGotStats(e.data);
     } else if (e.data.type === 'trs-cal-cmd' && typeof scal !== 'undefined' && scal.ws) {
@@ -82,7 +84,7 @@ const SCAL_KIND = { reel: 'reel', post: 'post', video: 'video', photo: 'photo po
 const SCAL_VIEWS = ['day', 'week', 'month', 'list'];
 const SCAL_MONTHS_NAMED = { '2025-01': 'January 2025', '2025-08': 'August 2025', '2026-06': 'June 2026' };
 
-const scal = { view: 'week', src: 'all', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
+const scal = { view: 'week', src: 'all', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, pstats: {}, pasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
 const scalCache = {};            // 'YYYY-MM' -> [post]
 let scalSnaps = null, scalSync = null;
 try {
@@ -386,6 +388,7 @@ function scalPanelHtml(p, cols, posts) {
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <div><div class="scal-sec">Caption</div><p class="scal-pcap full">${scalCap(p)}</p></div>
       <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
+      ${scalPrivateNums(p)}
       ${scalTryHtml(p)}
     </div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
 }
@@ -462,7 +465,7 @@ async function scalEnsureStories() {
   scalPaint();
 }
 // The posts first (as before), then the stories when the chip is on.
-async function scalEnsure() { await scalEnsurePosts(); await scalEnsureStories(); }
+async function scalEnsure() { await scalEnsurePosts(); await scalEnsureStories(); scalAskPostStats(); }
 
 const scalStoriesOf = (date, net) => scal.stories ? (scalStoryCache[date.slice(0, 7)] || []).filter(s => s.date === date && scal.on[s.net] && (!net || s.net === net)) : [];
 function scalStoriesChip(cols) {
@@ -508,6 +511,34 @@ function scalAskStats() {
   if (scal.sasked[key]) return;
   scal.sasked[key] = true;
   try { window.parent.postMessage({ type: 'trs-cal-need-stats', from: per.from, to: per.to }, '*'); } catch (e) {}
+}
+// Post numbers (Kate, 13 Nov 2026): reach, saves, views, shares, interactions and watch time are private insights, so the public call never sends them. Held in the dashboard, this page asks it
+// (trs-cal-need-post-stats, two dates) and the signed-in dashboard (Level 3 and up) answers with trs-cal-post-stats. On its own address nothing is asked and nothing is shown.
+function scalAskPostStats() {
+  if (!calEmbedded || !scal.ws) return;
+  const per = scalPeriod(), key = per.months.join(',');
+  if (scal.pasked[key]) return;
+  scal.pasked[key] = true;
+  const from = per.months[0] + '-01', to = scalMonthEnd(per.months[per.months.length - 1]);
+  try { window.parent.postMessage({ type: 'trs-cal-need-post-stats', from, to }, '*'); } catch (e) {}
+}
+function scalGotPostStats(d) {
+  if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;
+  d.rows.forEach(r => {
+    if (!r || !SCAL_NETS.includes(r.network) || typeof r.posted_at !== 'string') return;
+    scal.pstats[r.network + '|' + r.posted_at] = { views: scalN(r.views), reach: scalN(r.reach), saves: scalN(r.saves), shares: scalN(r.shares), interactions: scalN(r.interactions), avgWatch: scalN(r.avg_watch), skip: scalN(r.skip_rate) };
+  });
+  scalPaint();
+}
+// The private block of the pop-up, only when the dashboard sent the numbers. Facebook's views are impressions.
+function scalPrivateNums(p) {
+  const st = scal.pstats[p.net + '|' + p.at]; if (!st) return '';
+  const items = [[p.viewLabel === 'Impressions' ? 'Impressions' : (scalIsVideo(p) ? 'Plays' : 'Views'), st.views], ['Reach', st.reach], ['Saves', st.saves], [p.repostLabel, st.shares], ['Interactions', st.interactions]]
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`);
+  if (st.avgWatch !== null && st.avgWatch !== undefined) items.push(`<div class="scal-num"><div class="v">${Math.round(st.avgWatch * 10) / 10}s</div><div class="l">Average watch time</div></div>`);
+  if (st.skip !== null && st.skip !== undefined) items.push(`<div class="scal-num"><div class="v">${Math.round(st.skip)}%</div><div class="l">Skipped early</div></div>`);
+  return items.length ? `<div><div class="scal-sec">Private numbers <span class="scal-priv">only you can see these, signed in</span></div><div class="scal-nums">${items.join('')}</div></div>` : '';
 }
 function scalGotStats(d) {
   if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;
