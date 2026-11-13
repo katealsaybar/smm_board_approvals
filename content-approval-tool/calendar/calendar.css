@@ -341,3 +341,20 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 
 /* The whole caption is read inside the window (Kate, 13 Nov 2026): the player's own 'See more' leaves for Facebook or Instagram. */
 .scal-pcap.full{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
+
+/* Manual or Scheduled, and carousels (Kate, 13 Nov 2026). Amber is Manual (posted by hand), green is Scheduled in Metricool. */
+.scal-src{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;letter-spacing:.02em;line-height:1;padding:3px 7px;border-radius:999px;white-space:nowrap;vertical-align:middle;border:1px solid transparent}
+.scal-src::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.scal-src.man{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.scal-src.sch{background:var(--good-bg);color:var(--good);border-color:color-mix(in srgb,var(--good) 30%,transparent)}
+.scal-tc .scal-r1{flex-wrap:wrap}
+.scal-ph .when .scal-src{margin-left:6px}
+.scal-lrow .pl .scal-src{margin-left:8px}
+.scal-sd{width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none;box-shadow:0 0 0 2px var(--warn-bg)}
+.scal-srcline{margin:0;font-size:13.5px;color:var(--muted)}
+.scal-stack{position:absolute;right:3px;top:3px;width:14px;height:14px;fill:#fff;stroke:#fff;stroke-width:2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.scal-stack rect{fill:none}
+.scal-th{position:relative}
+.scal-srcbar{display:flex;align-items:center;gap:8px}
+.scal-srclbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted2);font-weight:600}
+.scal-srcbar .sc-seg button{min-height:34px;font-size:13.5px;padding:0 14px}

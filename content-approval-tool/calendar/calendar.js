@@ -78,21 +78,22 @@ const SCAL_CODE = { instagram: 'IG', facebook: 'FB', tiktok: 'TT', youtube: 'YT'
 // The first month Metricool holds posts for, a platform at a time (see project notes: FB Jan 2025, IG Aug 2025, TikTok Jun 2026).
 const SCAL_START = { instagram: '2025-08', facebook: '2025-01', tiktok: '2026-06' };
 const SCAL_FIRST = '2025-01';
-const SCAL_KIND = { reel: 'reel', post: 'post', video: 'video', photo: 'photo post' };
+const SCAL_KIND = { reel: 'reel', post: 'post', video: 'video', photo: 'photo post', carousel: 'carousel' };
 const SCAL_VIEWS = ['day', 'week', 'month', 'list'];
 const SCAL_MONTHS_NAMED = { '2025-01': 'January 2025', '2025-08': 'August 2025', '2026-06': 'June 2026' };
 
-const scal = { view: 'week', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
+const scal = { view: 'week', src: 'all', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
 const scalCache = {};            // 'YYYY-MM' -> [post]
 let scalSnaps = null, scalSync = null;
 try {
   const s = JSON.parse(localStorage.getItem('trs-approvals-scal') || '{}');
   if (SCAL_VIEWS.includes(s.view)) scal.view = s.view;
   scal.stories = s.stories === true;
+  if (['all', 'manual', 'metricool'].includes(s.src)) scal.src = s.src;
   if (s.on) SCAL_NETS.forEach(n => { if (typeof s.on[n] === 'boolean') scal.on[n] = s.on[n]; });
   if (!SCAL_NETS.some(n => scal.on[n])) SCAL_NETS.forEach(n => { scal.on[n] = true; });
 } catch (e) {}
-const scalSave = () => { try { localStorage.setItem('trs-approvals-scal', JSON.stringify({ view: scal.view, on: scal.on, stories: scal.stories })); } catch (e) {} };
+const scalSave = () => { try { localStorage.setItem('trs-approvals-scal', JSON.stringify({ view: scal.view, on: scal.on, stories: scal.stories, src: scal.src })); } catch (e) {} };
 
 // ── Dates (all Dubai days, as ISO strings) ────────────────────────────────────────
 const scalToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
@@ -119,9 +120,9 @@ const scalHue = id => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 
 
 // ── Posts ─────────────────────────────────────────────────────────────────────────
 function scalPost(p, i, key) {
-  const net = p.network, kind = SCAL_KIND[p.kind] ? p.kind : 'post';
+  const net = p.network, kind = p.carousel === true ? 'carousel' : (SCAL_KIND[p.kind] ? p.kind : 'post');
   const reposts = net === 'instagram' ? scalN(p.extra && p.extra.reposts) : scalN(p.shares);
-  return { id: key + '#' + i, net, kind, date: String(p.post_date || '').slice(0, 10), at: p.posted_at, t: scalTimeParts(p.posted_at),
+  return { id: key + '#' + i, net, kind, source: (p.source === 'manual' || p.source === 'metricool') ? p.source : null, slides: scalN(p.slides), date: String(p.post_date || '').slice(0, 10), at: p.posted_at, t: scalTimeParts(p.posted_at),
     cap: String(p.caption || '').trim(), url: p.url || '', img: p.image_url || '',
     views: scalN(p.views), reach: scalN(p.reach), likes: scalN(p.likes), comments: scalN(p.comments), reposts, saves: scalN(p.saves),
     // Facebook posts report impressions in the views field; its reels and the other apps report plays.
@@ -129,6 +130,14 @@ function scalPost(p, i, key) {
     repostLabel: net === 'instagram' ? 'Reposts' : 'Shares' };
 }
 const scalIsVideo = p => p.kind === 'reel' || p.kind === 'video';
+// Manual or Scheduled (Kate, 13 Nov 2026): Hanneh posts most things by hand, the rest is scheduled in Metricool. Amber is Manual, green is Scheduled.
+const scalSrcBadge = p => p.source ? `<span class="scal-src ${p.source === 'manual' ? 'man' : 'sch'}" title="${p.source === 'manual' ? 'Posted by hand' : 'Scheduled in Metricool'}">${p.source === 'manual' ? 'Manual' : 'Scheduled'}</span>` : '';
+const SCAL_STACK = '<svg class="scal-stack" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="13" height="13" rx="2.5"></rect><path d="M5 8v10a3 3 0 0 0 3 3h10" fill="none"></path></svg>';
+function scalSrcNote(posts) {
+  const m = posts.filter(p => p.source === 'manual').length, c = posts.filter(p => p.source === 'metricool').length;
+  return m + c ? ` By hand: ${m}, scheduled in Metricool: ${c}.` : '';
+}
+function scalSrc(k) { scal.src = k; scal.sel = null; scalSave(); scalPaint(); }
 
 async function scalLoad(key) {
   if (scalCache[key]) return;
@@ -156,7 +165,7 @@ function scalPeriod() {
   }
   return { kind: 'month', from: scal.month + '-01', to: scalMonthEnd(scal.month), label: scalMonthName(scal.month), months: [scal.month] };
 }
-const scalPosts = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to && scal.on[p.net]);
+const scalPosts = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to && scal.on[p.net] && (scal.src === 'all' || p.source === scal.src));
 const scalFind = id => { for (const k in scalCache) { const f = scalCache[k].find(p => p.id === id); if (f) return f; } return null; };
 
 function scalEdges(per, today) {
@@ -201,8 +210,8 @@ const scalStats = p => `<b>${scalFmt(p.likes)}</b> likes · <b>${scalFmt(p.comme
 function scalTile(p, cols, cls) {
   const cur = scal.sel === p.id ? ' aria-current="true"' : '';
   return `<button type="button" class="scal-${cls}" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)">
-    <span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span>
-    ${cls === 'wc' ? '<span class="bd">' : ''}<span class="scal-r1"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${scalClock(p.t) || 'Time not known'}</span>
+    <span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : (p.kind === 'carousel' ? SCAL_STACK : '')}</span>
+    ${cls === 'wc' ? '<span class="bd">' : ''}<span class="scal-r1"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${scalClock(p.t) || 'Time not known'}${scalSrcBadge(p)}</span>
     <span class="scal-cp">${scalCap(p)}</span><span class="scal-st">${scalStats(p)}</span>${cls === 'wc' ? '</span>' : ''}</button>`;
 }
 
@@ -224,11 +233,12 @@ function scalPaint() {
     SCAL_NETS.map(n => `<button type="button" class="scal-plat" style="--c:${cols[n]};--bf:${scalBadgeFg(cols[n])}" aria-pressed="${!!scal.on[n]}" onclick="scalPlat('${n}')"><span class="scal-b" aria-hidden="true">${SCAL_CODE[n]}</span>${SOC_NETS[n]}</button>`).join('') +
     scalStoriesChip(cols) + `<span class="scal-plat off" title="YouTube is not on the calendar yet. Metricool gives us daily totals for it, not a list of videos."><span class="scal-b" aria-hidden="true">YT</span>YouTube <em>not yet</em></span>`;
 
+  const srcBtns = [['all', 'Everything'], ['manual', 'Manual'], ['metricool', 'Scheduled']].map(([k, l]) => `<button type="button" class="${scal.src === k ? 'on' : ''}" aria-pressed="${scal.src === k}" onclick="scalSrc('${k}')">${l}</button>`).join('');
   let answer;
   if (scal.busy && !posts.length) answer = 'Loading the posts…';
   else if (scal.err) answer = 'The posts did not load. Refresh to try again.';
   else if (!posts.length) answer = `No posts in <b>${mkEsc(per.label)}</b> with these platforms.`;
-  else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.likes)} likes.${scalStoryNote(per)}`;
+  else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.likes)} likes.${scalSrcNote(posts)}${scalStoryNote(per)}`;
 
   const hint = nOn === 1 ? 'Showing one platform. Tap another to add it.' : allOn ? 'Showing everything. Tap one platform to see just that one.' : `Showing ${nOn} platforms together, one colour each.`;
   const viewBtns = [['day', 'Daily'], ['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([k, l]) => `<button type="button" class="${scal.view === k ? 'on' : ''}" aria-pressed="${scal.view === k}" onclick="scalView('${k}')">${l}</button>`).join('');
@@ -249,6 +259,7 @@ function scalPaint() {
         <div class="sc-seg scal-seg" role="group" aria-label="View">${viewBtns}</div>
       </div>
       <div class="scal-plats" role="group" aria-label="Platforms">${chips}</div>
+      <div class="scal-srcbar"><span class="scal-srclbl">Posted</span><div class="sc-seg scal-seg" role="group" aria-label="How it was posted">${srcBtns}</div></div>
     </div>
     <p class="scal-hint">${hint}</p>
     <section class="scal-answer" aria-live="polite"><div>${answer}</div><div class="scal-actions">${best ? `<button type="button" class="sc-btn primary" data-id="${mkEsc(best.id)}" onclick="scalOpen(this.dataset.id)">See that post</button>` : ''}${posts.length ? `<button type="button" class="sc-btn" onclick="scalDownload('xlsx')">Download XLSX</button><button type="button" class="sc-btn" onclick="scalDownload('csv')">Download CSV</button>` : ''}</div></section>
@@ -309,8 +320,8 @@ function scalMonthHtml(posts, cols, per, today) {
   posts.forEach(p => { (by[p.date] = by[p.date] || []).push(p); });
   const pill = p => { const cur = scal.sel === p.id ? ' aria-current="true"' : '';
     return solo
-      ? `<button type="button" class="scal-tile" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tm">${scalClock(p.t, true)}</span></button>`
-      : `<button type="button" class="scal-pill" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span><span class="t">${scalClock(p.t, true)}</span>${scalIsVideo(p) ? `<span class="k" title="${SCAL_KIND[p.kind]}" aria-hidden="true">▶</span>` : ''}<span class="c">${scalCap(p)}</span></button>`; };
+      ? `<button type="button" class="scal-tile" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : (p.kind === 'carousel' ? SCAL_STACK : '')}</span><span class="tm">${scalClock(p.t, true)}</span></button>`
+      : `<button type="button" class="scal-pill" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span><span class="t">${scalClock(p.t, true)}</span>${p.source === 'manual' ? '<span class="scal-sd" title="Posted by hand"></span>' : ''}${scalIsVideo(p) ? `<span class="k" title="${SCAL_KIND[p.kind]}" aria-hidden="true">▶</span>` : ''}<span class="c">${scalCap(p)}</span></button>`; };
   let cells = '';
   for (let i = 0; i < total; i++) {
     const day = i - lead + 1, inM = day >= 1 && day <= nd, iso = inM ? per.from.slice(0, 8) + String(day).padStart(2, '0') : '';
@@ -337,8 +348,8 @@ function scalListRowsHtml(posts, cols) {
     const cur = scal.sel === p.id ? ' aria-current="true"' : '';
     return `<button type="button" class="scal-lrow" data-id="${mkEsc(p.id)}" style="${scalStyle(p, cols)}" aria-label="${mkEsc(scalLabel(p))}"${cur} onclick="scalOpen(this.dataset.id)">
       <span class="d"><b>${scalShort(p.date)}</b><span>${scalClock(p.t) || 'Time not known'}</span></span>
-      <span class="pc"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : ''}</span><span class="tx"><span class="cp">${scalCap(p)}</span><span class="mini">${SOC_NETS[p.net]} · ${scalFmt(p.likes)} likes · ${scalFmt(p.comments)} comments</span></span></span>
-      <span class="pl"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${SOC_NETS[p.net]} · ${SCAL_KIND[p.kind]}</span>
+      <span class="pc"><span class="scal-th">${scalImg(p)}${scalIsVideo(p) ? SCAL_PLAY : (p.kind === 'carousel' ? SCAL_STACK : '')}</span><span class="tx"><span class="cp">${scalCap(p)}</span><span class="mini">${SOC_NETS[p.net]} · ${scalFmt(p.likes)} likes · ${scalFmt(p.comments)} comments</span></span></span>
+      <span class="pl"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[p.net]}</span>${SOC_NETS[p.net]} · ${SCAL_KIND[p.kind]}${scalSrcBadge(p)}</span>
       <span class="n">${scalFmt(p.likes)}</span><span class="n">${scalFmt(p.reposts)}</span><span class="n">${scalFmt(p.comments)}</span><span class="n">${scalFmt(p.views)}</span></button>`;
   }).join('') : '<div class="scal-empty" style="padding:16px 4px">No posts match.</div>');
 }
@@ -366,10 +377,11 @@ function scalPanelHtml(p, cols, posts) {
   const verb = p.net === 'instagram' ? 'Instagram' : p.net === 'facebook' ? 'Facebook' : 'TikTok';
   return `<aside class="scal-panel" role="dialog" aria-label="Post details" style="${scalStyle(p, cols)}">
     <div class="scal-ph"><span class="scal-b" aria-hidden="true">${SCAL_CODE[p.net]}</span>
-      <div class="when"><b>${scalLong(p.date)}${p.t ? ', ' + scalClock(p.t) : ''}</b><span>${SOC_NETS[p.net]} ${SCAL_KIND[p.kind]}</span></div>
+      <div class="when"><b>${scalLong(p.date)}${p.t ? ', ' + scalClock(p.t) : ''}</b><span>${SOC_NETS[p.net]} ${SCAL_KIND[p.kind]}${p.kind === 'carousel' && p.slides ? ', ' + p.slides + ' slides' : ''} ${scalSrcBadge(p)}</span></div>
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">
       ${verdict}
+      ${p.source ? `<p class="scal-srcline">${p.source === 'manual' ? 'Posted by hand, not scheduled in Metricool.' : 'Scheduled in Metricool.'}</p>` : ''}
       <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${(scalIsVideo(p) || scalEmbedUrl(p)) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="${scalIsVideo(p) ? 'Play' : 'Show'} this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <div><div class="scal-sec">Caption</div><p class="scal-pcap full">${scalCap(p)}</p></div>
@@ -678,8 +690,8 @@ document.addEventListener('click', async e => {
 function scalTable() {
   const per = scalPeriod(), posts = scalPosts(per).slice().sort((a, b) => (a.at || a.date) < (b.at || b.date) ? -1 : 1);
   if (!posts.length) return null;
-  const head = ['Date', 'Time (Dubai)', 'Platform', 'Type', 'Caption', 'Likes', 'Comments', 'Reposts or shares', 'Plays (reels and videos)', 'Link'];
-  const rows = posts.map(p => [p.date, scalClock(p.t) || '', SOC_NETS[p.net], SCAL_KIND[p.kind], p.cap.replace(/\s+/g, ' ').slice(0, 300), p.likes, p.comments, p.reposts, p.views, calSafeUrl(p.url)]);
+  const head = ['Date', 'Time (Dubai)', 'Platform', 'Type', 'Caption', 'Likes', 'Comments', 'Reposts or shares', 'Plays (reels and videos)', 'Posted how', 'Link'];
+  const rows = posts.map(p => [p.date, scalClock(p.t) || '', SOC_NETS[p.net], SCAL_KIND[p.kind], p.cap.replace(/\s+/g, ' ').slice(0, 300), p.likes, p.comments, p.reposts, p.views, p.source === 'manual' ? 'Manual' : p.source === 'metricool' ? 'Scheduled in Metricool' : '', calSafeUrl(p.url)]);
   return { name: ['social-posts', per.from, 'to', per.to].join('-'), head, rows };
 }
 // A cell that starts with = + - or @ would run as a formula in a spreadsheet; a leading apostrophe keeps it as text.
