@@ -41,12 +41,14 @@ if (calEmbedded) {
     if (e.data.type === 'trs-theme' && (e.data.theme === 'dark' || e.data.theme === 'light')) {
       document.documentElement.setAttribute('data-theme', e.data.theme);
       if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
+    } else if (e.data.type === 'trs-cal-stories' && typeof scal !== 'undefined') {
+      scalGotStats(e.data);
     } else if (e.data.type === 'trs-cal-cmd' && typeof scal !== 'undefined' && scal.ws) {
       const c = e.data.cmd;
       if (c === 'prev') scalNav(-1);
       else if (c === 'next') scalNav(1);
       else if (c === 'today') scalToToday();
-      else if (c === 'view' && ['week', 'month', 'list'].includes(e.data.value)) scalView(e.data.value);
+      else if (c === 'view' && SCAL_VIEWS.includes(e.data.value)) scalView(e.data.value);
     }
   });
 }
@@ -77,14 +79,15 @@ const SCAL_CODE = { instagram: 'IG', facebook: 'FB', tiktok: 'TT', youtube: 'YT'
 const SCAL_START = { instagram: '2025-08', facebook: '2025-01', tiktok: '2026-06' };
 const SCAL_FIRST = '2025-01';
 const SCAL_KIND = { reel: 'reel', post: 'post', video: 'video', photo: 'photo post' };
+const SCAL_VIEWS = ['day', 'week', 'month', 'list'];
 const SCAL_MONTHS_NAMED = { '2025-01': 'January 2025', '2025-08': 'August 2025', '2026-06': 'June 2026' };
 
-const scal = { view: 'week', ws: null, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
+const scal = { view: 'week', ws: null, dd: null, sstats: {}, statsOk: false, sasked: {}, month: null, scope: 'month', on: { instagram: true, facebook: true, tiktok: true }, sel: null, stories: false, sday: null, q: '', sort: 'new', open: null, busy: false, err: false };
 const scalCache = {};            // 'YYYY-MM' -> [post]
 let scalSnaps = null, scalSync = null;
 try {
   const s = JSON.parse(localStorage.getItem('trs-approvals-scal') || '{}');
-  if (['week', 'month', 'list'].includes(s.view)) scal.view = s.view;
+  if (SCAL_VIEWS.includes(s.view)) scal.view = s.view;
   scal.stories = s.stories === true;
   if (s.on) SCAL_NETS.forEach(n => { if (typeof s.on[n] === 'boolean') scal.on[n] = s.on[n]; });
   if (!SCAL_NETS.some(n => scal.on[n])) SCAL_NETS.forEach(n => { scal.on[n] = true; });
@@ -139,6 +142,10 @@ async function scalLoad(key) {
 
 // The period on screen: a week (Week view, or the List opened from a week's count) or a month.
 function scalPeriod() {
+  if (scal.view === 'day' || (scal.view === 'list' && scal.scope === 'day')) {
+    const d = scal.dd, label = mkD(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return { kind: 'day', from: d, to: d, label, months: [d.slice(0, 7)] };
+  }
   const week = scal.view === 'week' || (scal.view === 'list' && scal.scope === 'week');
   if (week) {
     const from = scal.ws, to = scalAdd(from, 6), a = from.slice(0, 7), b = to.slice(0, 7);
@@ -152,8 +159,14 @@ function scalPeriod() {
 const scalPosts = per => per.months.flatMap(k => scalCache[k] || []).filter(p => p.date >= per.from && p.date <= per.to && scal.on[p.net]);
 const scalFind = id => { for (const k in scalCache) { const f = scalCache[k].find(p => p.id === id); if (f) return f; } return null; };
 
+function scalEdges(per, today) {
+  if (per.kind === 'day') return { atMin: scal.dd <= SCAL_FIRST + '-01', atMax: scal.dd >= today };
+  if (per.kind === 'week') return { atMin: scal.ws <= scalMon(SCAL_FIRST + '-01'), atMax: scal.ws >= scalMon(today) };
+  return { atMin: scal.month <= SCAL_FIRST, atMax: scal.month >= today.slice(0, 7) };
+}
+
 async function scalEnsurePosts() {
-  if (!scal.ws) { const t = scalToday(); scal.ws = scalMon(t); scal.month = t.slice(0, 7); }
+  if (!scal.ws) { const t = scalToday(); scal.ws = scalMon(t); scal.month = t.slice(0, 7); scal.dd = t; }
   const per = scalPeriod(), need = per.months.filter(k => !scalCache[k]);
   if (!need.length) { scal.busy = false; scal.err = false; scalPaint(); return; }
   scal.busy = true; scalPaint();
@@ -202,8 +215,7 @@ function scalPaint() {
   const cols = socCols(), per = scalPeriod(), posts = scalPosts(per), today = scalToday();
   const nOn = SCAL_NETS.filter(n => scal.on[n]).length, allOn = nOn === SCAL_NETS.length;
   const best = posts.length ? posts.reduce((a, b) => (b.likes || 0) > (a.likes || 0) ? b : a) : null;
-  const atMin = per.kind === 'week' ? scal.ws <= scalMon(SCAL_FIRST + '-01') : scal.month <= SCAL_FIRST;
-  const atMax = per.kind === 'week' ? scal.ws >= scalMon(today) : scal.month >= today.slice(0, 7);
+  const { atMin, atMax } = scalEdges(per, today);
   const late = SCAL_NETS.filter(n => scal.on[n] && per.from.slice(0, 7) < SCAL_START[n]);
   const stale = !scalSync || !scalSync.last_ok_at;
   const synced = scalSync && scalSync.last_ok_at ? new Date(scalSync.last_ok_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
@@ -219,10 +231,11 @@ function scalPaint() {
   else answer = `<b>${mkEsc(per.label)}</b>: <button type="button" class="scal-link" onclick="scalShowList()">${posts.length} post${posts.length === 1 ? '' : 's'}</button>. Best one: the ${SOC_NETS[best.net]} ${SCAL_KIND[best.kind]} on ${scalShort(best.date)}, ${scalFmt(best.likes)} likes.${scalStoryNote(per)}`;
 
   const hint = nOn === 1 ? 'Showing one platform. Tap another to add it.' : allOn ? 'Showing everything. Tap one platform to see just that one.' : `Showing ${nOn} platforms together, one colour each.`;
-  const viewBtns = [['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([k, l]) => `<button type="button" class="${scal.view === k ? 'on' : ''}" aria-pressed="${scal.view === k}" onclick="scalView('${k}')">${l}</button>`).join('');
+  const viewBtns = [['day', 'Daily'], ['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([k, l]) => `<button type="button" class="${scal.view === k ? 'on' : ''}" aria-pressed="${scal.view === k}" onclick="scalView('${k}')">${l}</button>`).join('');
 
   let body = '';
-  if (scal.view === 'week') body = scalWeekHtml(posts, cols, per, today);
+  if (scal.view === 'day') body = scalDayHtml(posts, cols, per, today);
+  else if (scal.view === 'week') body = scalWeekHtml(posts, cols, per, today);
   else if (scal.view === 'month') body = scalMonthHtml(posts, cols, per, today);
   else body = scalListHtml(posts, cols, per);
 
@@ -244,7 +257,7 @@ function scalPaint() {
       <div class="scal-cal">${body}</div>
       ${scal.sday ? scalStoryPanelHtml(cols) : scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
     </div>
-    <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories show when the Stories chip is on, as a picture and the time (story numbers are private, so none are shown). Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
+    <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories show when the Stories chip is on, as a picture and the time (${scal.statsOk ? 'their numbers show because you are signed in to the dashboard' : 'story numbers are private, so none are shown'}). Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
   if (scal.sel) { const c = root.querySelector('.scal-close'); if (c && scal.focusPanel) { c.focus(); scal.focusPanel = false; } }
 }
 
@@ -265,6 +278,22 @@ function scalWeekHtml(posts, cols, per, today) {
     return `<div class="scal-wcol${d > today ? ' future' : ''}${d === today ? ' today' : ''}"><div class="scal-wh"><b>${mkD(d).toLocaleDateString('en-GB', { weekday: 'short' })}</b><span class="n">${mkD(d).getDate()}</span></div>${scalStoryPills(d, cols)}${list.length ? list.map(p => scalTile(p, cols, 'wc')).join('') : `<div class="scal-empty">${d > today ? 'Not yet' : 'No posts'}</div>`}</div>`; }).join('');
   const legend = best ? '<p class="scal-legend"><span>Blue behind the hours:</span><i class="a"></i><i class="b"></i><i class="c"></i><span>darker is a better time to post, from Metricool, last 30 days.</span></p>' : '';
   return `${legend}<div class="scal-tgrid">${g}</div><div class="scal-wstack">${stacked}</div>`;
+}
+
+// Daily (Kate, 13 Nov 2026): one day, hours down the side with the posts in their hour, the stories of the day above them (a picture, the time, and their numbers when they are sent in).
+function scalDayHtml(posts, cols, per, today) {
+  const d = per.from, best = scalBest(), dow = (mkD(d).getDay() + 6) % 7;
+  const known = posts.filter(p => p.t), unknown = posts.filter(p => !p.t);
+  const stories = scalStoriesOf(d).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1);
+  const stHtml = scal.stories ? `<div class="scal-dstories"><div class="scal-sec">Stories${stories.length ? ', ' + stories.length : ''}</div>${stories.length ? scalStoryTotals(stories) + '<div class="scal-sgrid row">' + stories.map(s => scalStoryCard(s, cols)).join('') + '</div>' : '<div class="scal-empty">No stories this day.</div>'}${scalStoryCaption()}</div>` : '';
+  if (!posts.length) return stHtml + `<div class="scal-empty" style="padding:20px 4px">${d > today ? 'Not yet.' : 'No posts this day with these platforms.'}</div>`;
+  const hrs = known.map(p => p.t.h), h0 = Math.min(8, ...hrs), h1 = Math.max(22, ...hrs);
+  const cell = {}; known.forEach(p => { (cell[p.t.h] = cell[p.t.h] || []).push(p); });
+  let g = '';
+  if (unknown.length) g += '<div class="scal-hl">Time not known</div><div class="scal-hc l0">' + unknown.map(p => scalTile(p, cols, 'tc')).join('') + '</div>';
+  for (let h = h0; h <= h1; h++) g += `<div class="scal-hl">${scalHour(h)}</div><div class="scal-hc l${best ? best(dow, h) : 0}">${(cell[h] || []).map(p => scalTile(p, cols, 'tc')).join('')}</div>`;
+  const stacked = `<div class="scal-wcol${d === today ? ' today' : ''}">${posts.map(p => scalTile(p, cols, 'wc')).join('')}</div>`;
+  return `${stHtml}<div class="scal-tgrid day">${g}</div><div class="scal-wstack">${stacked}</div>`;
 }
 
 // Month: a pill a post for two or more platforms, a picture a post for one. On a phone, dots and the chosen day's list underneath.
@@ -312,7 +341,7 @@ function scalListHtml(posts, cols, per) {
     <div class="scal-ltool">
       <input type="search" id="scalQ" placeholder="Search captions" aria-label="Search captions" value="${mkEsc(scal.q)}" oninput="scalSearch(this.value)">
       <select id="scalSort" aria-label="Sort by" onchange="scalSortBy(this.value)">${[['new', 'Newest first'], ['likes', 'Most likes'], ['views', 'Most views']].map(([k, l]) => `<option value="${k}"${scal.sort === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-      ${scal.view === 'list' && scal.scope === 'week' ? `<button type="button" class="sc-btn" onclick="scalWholeMonth()">Show the whole month</button>` : ''}
+      ${scal.view === 'list' && scal.scope !== 'month' ? `<button type="button" class="sc-btn" onclick="scalWholeMonth()">Show the whole month</button>` : ''}
     </div>
     <div class="scal-lh"><span>Date</span><span>Post</span><span>Platform</span><span class="r">Likes</span><span class="r">Reposts</span><span class="r">Comments</span><span class="r">Views or impressions</span></div>
     <div id="scalRows">${scalListRowsHtml(posts, cols)}</div></div>`;
@@ -335,7 +364,7 @@ function scalPanelHtml(p, cols, posts) {
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">
       ${verdict}
-      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${scalIsVideo(p) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="Play this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
+      <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${(scalIsVideo(p) || scalEmbedUrl(p)) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="${scalIsVideo(p) ? 'Play' : 'Show'} this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <p class="scal-pcap">${scalCap(p)}</p>
       <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
@@ -355,19 +384,25 @@ function scalPlat(n) {
 }
 function scalView(v) {
   if (v === scal.view) return;
-  const from = scal.view;
-  if (v === 'week') scal.ws = scal.month === scalToday().slice(0, 7) ? scalMon(scalToday()) : scalMon(scal.month + '-01');
+  const from = scal.view, per0 = scalPeriod(), t0 = scalToday();
+  // The day a Daily view opens on: today when it is in the stretch on show, else the first day of it.
+  const anchor = per0.kind === 'day' ? scal.dd : (per0.from <= t0 && t0 <= per0.to ? t0 : per0.from);
+  if (v === 'day') scal.dd = anchor;
+  else if (v === 'week') scal.ws = from === 'day' ? scalMon(scal.dd) : (scal.month === scalToday().slice(0, 7) ? scalMon(scalToday()) : scalMon(scal.month + '-01'));
   else if (from === 'week') scal.month = scalAdd(scal.ws, 3).slice(0, 7);
+  else if (from === 'day') scal.month = scal.dd.slice(0, 7);
   scal.scope = 'month'; scal.view = v; scal.sel = null; scal.sday = null; scal.day = null; scal.open = null; scalSave(); scalEnsure();
 }
 function scalNav(d) {
-  if (scalPeriod().kind === 'week') scal.ws = scalAdd(scal.ws, 7 * d); else scal.month = scalShiftMonth(scal.month, d);
+  const k = scalPeriod().kind;
+  if (k === 'day') { scal.dd = scalAdd(scal.dd, d); scal.ws = scalMon(scal.dd); scal.month = scal.dd.slice(0, 7); }
+  else if (k === 'week') scal.ws = scalAdd(scal.ws, 7 * d); else scal.month = scalShiftMonth(scal.month, d);
   scal.sel = null; scal.sday = null; scal.day = null; scal.open = null; scalEnsure();
 }
-function scalToToday() { const t = scalToday(); scal.ws = scalMon(t); scal.month = t.slice(0, 7); scal.sel = null; scal.sday = null; scal.day = null; scal.open = null; scalEnsure(); }
+function scalToToday() { const t = scalToday(); scal.ws = scalMon(t); scal.month = t.slice(0, 7); scal.dd = t; scal.sel = null; scal.sday = null; scal.day = null; scal.open = null; scalEnsure(); }
 // The post count opens the posts behind it, for the same stretch of time.
 function scalShowList() { scal.scope = scalPeriod().kind; scal.view = 'list'; scal.sel = null; scalSave(); scalEnsure(); }
-function scalWholeMonth() { scal.month = scal.ws.slice(0, 7); scal.scope = 'month'; scalEnsure(); }
+function scalWholeMonth() { const per = scalPeriod(); scal.month = per.from.slice(0, 7); scal.scope = 'month'; scalEnsure(); }
 function scalDay(iso) { scal.day = iso; scalPaint(); }
 function scalMore(iso) { scal.open = iso; scalPaint(); }
 function scalSearch(v) {
@@ -395,8 +430,10 @@ async function scalLoadStories(key) {
 async function scalEnsureStories() {
   if (!scal.stories) return;
   const need = scalPeriod().months.filter(k => !scalStoryCache[k]);
+  if (!need.length) { scalAskStats(); return; }
   if (!need.length) return;
   try { await Promise.all(need.map(scalLoadStories)); scal.serr = false; } catch (e) { console.error(e); scal.serr = true; }
+  scalAskStats();
   scalPaint();
 }
 // The posts first (as before), then the stories when the chip is on.
@@ -428,16 +465,58 @@ function scalStoryNote(per) {
   if (fb) parts.push(fb + ' on Facebook');
   return all.length ? ' Stories: ' + parts.join(', ') + '.' : ' No stories in this stretch.';
 }
+// Story numbers (Kate, 13 Nov 2026). The public call sends no numbers, so none come from this page's own database call. When this page is held in the dashboard,
+// the dashboard (signed in, Level 3 and up) answers a trs-cal-need-stats request with trs-cal-stories, and only the page that holds this frame is listened to.
+const SCAL_SFIELDS = [['views', 'Views'], ['reach', 'Reach'], ['replies', 'Replies'], ['reactions', 'Reactions'], ['taps_forward', 'Taps forward'], ['taps_back', 'Taps back'], ['exits', 'Exits']];
+const scalStatOf = s => scal.sstats[s.net + '|' + s.at] || null;
+function scalAskStats() {
+  if (!calEmbedded || !scal.stories || !scal.ws) return;
+  const per = scalPeriod(), key = per.from + '|' + per.to;
+  if (scal.sasked[key]) return;
+  scal.sasked[key] = true;
+  try { window.parent.postMessage({ type: 'trs-cal-need-stats', from: per.from, to: per.to }, '*'); } catch (e) {}
+}
+function scalGotStats(d) {
+  if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;
+  d.rows.forEach(r => {
+    if (!r || !SCAL_NETS.includes(r.network) || typeof r.posted_at !== 'string') return;
+    const o = { url: calSafeUrl(r.url) };
+    SCAL_SFIELDS.forEach(([k]) => { o[k] = scalN(r[k]); });
+    scal.sstats[r.network + '|' + r.posted_at] = o;
+  });
+  if (d.rows.length) scal.statsOk = true;
+  scalPaint();
+}
+function scalStatLines(st) {
+  const items = SCAL_SFIELDS.filter(([k]) => st[k] !== null && st[k] !== undefined).map(([k, l]) => `<div><dt>${l}</dt><dd>${scalFmt(st[k])}</dd></div>`).join('');
+  return items ? `<dl class="scal-sstats">${items}</dl>` : '';
+}
+function scalStoryCard(s, cols) {
+  const st = scalStatOf(s), c = cols[s.net];
+  return `<figure class="scal-story" style="--c:${c};--bf:${scalBadgeFg(c)}"><div class="scal-sth">${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+    <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')}</b>${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
+}
+function scalStoryTotals(list) {
+  const tot = {}, got = list.map(scalStatOf).filter(Boolean);
+  if (!got.length) return '';
+  SCAL_SFIELDS.forEach(([k]) => { const v = got.map(x => x[k]).filter(x => x !== null && x !== undefined); if (v.length) tot[k] = v.reduce((a, b) => a + b, 0); });
+  return `<div class="scal-stot"><span>All ${list.length} stories</span>${scalStatLines(tot)}</div>`;
+}
+function scalStoryCaption() {
+  return scal.statsOk
+    ? '<p class="scal-pcap">Story numbers come from Metricool and show here because you are signed in to the dashboard. Instagram and Facebook do not offer a player for stories, so a story shows as its picture; the link opens it while it is still live, for 24 hours.</p>'
+    : '<p class="scal-pcap">Pictures and times only. Story numbers (views, reach, replies, taps) are private, so they are not shown on this page.</p>';
+}
 function scalStoryOpen(date, net) { scal.sel = null; scal.sday = { date, net }; scal.focusPanel = true; scalPaint(); }
 function scalStoryPanelHtml(cols) {
   const { date, net } = scal.sday, list = scalStoriesOf(date, net).slice().sort((a, b) => (a.at || '') < (b.at || '') ? -1 : 1);
-  const tiles = list.map(s => `<figure class="scal-story"><div class="scal-sth">${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div><figcaption>${mkEsc(scalClock(s.t) || '')}</figcaption></figure>`).join('');
+  const tiles = list.map(s => scalStoryCard(s, cols)).join('');
   return `<aside class="scal-panel" role="dialog" aria-label="Stories" style="--c:${cols[net]};--bf:${scalBadgeFg(cols[net])}">
     <div class="scal-ph"><span class="scal-b" aria-hidden="true">${SCAL_CODE[net]}</span>
       <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]} stories, ${list.length}</span></div>
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
-    <div class="scal-pb">${list.length ? `<div class="scal-sgrid">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
-      <p class="scal-pcap">Pictures and times only. Story numbers (views, reach, replies, taps) are private, so they are not shown on this page.</p></div></aside><div class="scal-scrim" onclick="scalClose()"></div>`;
+    <div class="scal-pb">${list.length ? scalStoryTotals(list) + `<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
+      ${scalStoryCaption()}</div></aside><div class="scal-scrim" onclick="scalClose()"></div>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
@@ -529,8 +608,7 @@ async function scalDownload(kind) {
 function scalPostState() {
   if (!calEmbedded || !scal.ws) return;
   const per = scalPeriod(), today = scalToday();
-  const atMin = per.kind === 'week' ? scal.ws <= scalMon(SCAL_FIRST + '-01') : scal.month <= SCAL_FIRST;
-  const atMax = per.kind === 'week' ? scal.ws >= scalMon(today) : scal.month >= today.slice(0, 7);
+  const { atMin, atMax } = scalEdges(per, today);
   try { window.parent.postMessage({ type: 'trs-cal-state', label: per.label, view: scal.view, atMin, atMax }, '*'); } catch (e) {}
 }
 const scalPaintInner = scalPaint;
@@ -568,7 +646,7 @@ function scalEmbedUrl(p) {
   try {
     const x = new URL(u), host = x.hostname.replace(/^www\./, '');
     if (p.net === 'instagram' && host === 'instagram.com') { const m = x.pathname.match(/^\/(reel|p|tv)\/([A-Za-z0-9_-]+)/); return m ? { src: 'https://www.instagram.com/' + m[1] + '/' + m[2] + '/embed/', h: 600 } : null; }
-    if (p.net === 'facebook' && host === 'facebook.com') return { src: 'https://www.facebook.com/plugins/video.php?show_text=false&width=380&href=' + encodeURIComponent(u), h: 520 };
+    if (p.net === 'facebook' && host === 'facebook.com') return scalIsVideo(p) ? { src: 'https://www.facebook.com/plugins/video.php?show_text=false&width=380&href=' + encodeURIComponent(u), h: 520 } : { src: 'https://www.facebook.com/plugins/post.php?show_text=true&width=380&href=' + encodeURIComponent(u), h: 560 };
     if (p.net === 'tiktok' && host === 'tiktok.com') { const m = x.pathname.match(/\/video\/(\d+)/); return m ? { src: 'https://www.tiktok.com/embed/v2/' + m[1], h: 620 } : null; }
   } catch (e) {}
   return null;
