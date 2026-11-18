@@ -350,14 +350,15 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 
 /* Viewer sizing (Kate, 18 Nov 2026). The whole 9:16 picture shows: the name bar sits above it and the numbers under it, nothing lies on top of it.
    The frame takes the height of the window (the dashboard stretches the frame over the window while the viewer is open, see scalLbTell). */
-.scal-lbframe.story{--H:min(calc(100vh - 28px),940px);--hd:54px;--ft:132px;height:var(--H);width:calc((var(--H) - var(--hd) - var(--ft))*9/16);min-width:min(240px,calc(100vw - 16px));max-width:calc(100vw - 112px);background:#0b0b10}
+.scal-lbframe.story{--H:min(calc(100vh - 60px),940px);--hd:54px;--ft:132px;height:var(--H);width:calc((var(--H) - var(--hd) - var(--ft))*9/16);min-width:min(240px,calc(100vw - 16px));max-width:calc(100vw - 112px);background:#0b0b10}
 .scal-lbframe.story .scal-lbbars{position:static;flex:none;height:3px;margin:10px 12px 0}
 .scal-lbframe.story .scal-lbhd{position:static;flex:none;height:24px;margin:8px 12px 9px}
 .scal-lbframe.story .scal-lbmedia{position:relative;inset:auto;flex:1;min-height:0}
 .scal-lbframe.story .scal-lbtap{top:var(--hd);bottom:calc(var(--ft) + 52px)}
 .scal-lbframe.story .scal-lbft{position:static;flex:none;height:var(--ft);box-sizing:border-box;padding:10px 14px;background:#0b0b10;overflow:auto;gap:4px}
 .scal-lbframe.story .scal-lbft .scal-sstats{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
-.scal-lbframe.post{width:min(520px,calc(100vw - 112px));height:min(calc(100vh - 28px),960px)}
+.scal-lbframe.post{width:min(520px,calc(100vw - 112px));height:min(calc(100vh - 60px),960px)}
+.scal-lbcount{bottom:8px}
 .scal-lbframe.post .scal-lbcap{max-height:5.5em}
 .scal-lbframe.post .scal-lbmedia iframe{min-height:0}
 @media(max-width:560px){
