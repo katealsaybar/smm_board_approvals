@@ -403,6 +403,30 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-pic{aspect-ratio:9/16;max-height:none;max-width:300px;background:#0b0b10}
 .scal-pic img{object-fit:contain}
 
+/* Import many stories from an archive (Kate, 18 Nov 2026) */
+.scal-impbtn{padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
+.scal-impbtn:hover{background:var(--surface)}
+.scal-imp{position:fixed;inset:0;z-index:1100;background:rgba(8,8,12,.82);display:flex;align-items:center;justify-content:center;padding:16px}
+.scal-impbox{position:relative;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:14px;width:min(640px,100%);max-height:min(88vh,760px);overflow:auto;padding:22px 24px}
+.scal-impbox h3{margin:0 40px 10px 0;font-size:18px}
+.scal-impbox p{margin:0 0 12px;line-height:1.5;font-size:14px}
+.scal-impbox .scal-imph{color:var(--muted);font-size:13px}
+.scal-impbox .scal-imperr{color:#e5484d;font-weight:600}
+.scal-impr{margin-left:12px;font-weight:600;cursor:pointer}
+.scal-impn span{color:var(--muted)}
+.scal-impl{list-style:none;margin:0 0 12px;padding:8px 12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px}
+.scal-impl li{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.scal-impl li span{color:var(--muted)}
+.scal-impl.err li{color:#e5484d}
+.scal-impa{display:flex;gap:10px;align-items:center;margin-top:6px}
+.scal-impg{padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer}
+.scal-impp{height:8px;border-radius:8px;background:var(--surface2);overflow:hidden;margin:0 0 12px}
+.scal-impp i{display:block;height:100%;background:var(--text);transition:width .2s}
+.scal-impbox .scal-lbbtn{background:var(--text);color:var(--surface)}
+.scal-impbox button.scal-lbbtn{border:0;font-family:inherit}
+.scal-impbox .scal-lbbtn[disabled]{opacity:.4;cursor:default}
+.scal-impx{position:absolute;top:10px;right:12px;width:34px;height:34px;font-size:22px;background:var(--surface2);color:var(--text)}
+
 /* The whole caption is read inside the window (Kate, 13 Nov 2026): the player's own 'See more' leaves for Facebook or Instagram. */
 .scal-pcap.full{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
 

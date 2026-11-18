@@ -587,6 +587,7 @@ function scalGotStats(d) {
     scal.sstats[r.network + '|' + r.posted_at] = o;
   });
   if (d.rows.length) scal.statsOk = true;
+  if (scalImp && scalImp.waitStats && d.from === scalImp.waitStats.from && d.to === scalImp.waitStats.to) { const w = scalImp.waitStats; scalImp.waitStats = null; w.res(); }
   scalPaint();
   if (scalLb) scalLbPaint();   // an open viewer picks up a file that was just attached
 }
@@ -664,6 +665,7 @@ function scalAttach(inp) {
   try { window.parent.postMessage({ type: 'trs-cal-attach', net: s.net, at: s.at, key, file: f }, '*'); } catch (e) { fail('Could not send the file to the dashboard.'); }
 }
 function scalGotAttached(d) {
+  if (scalImp && scalImp.wait && d && d.net + '|' + d.at === scalImp.wait.id) { const w = scalImp.wait; scalImp.wait = null; w.res(d); return; }
   if (!d || !scal.attach) return;
   const id = d.net + '|' + d.at;
   if (scal.attach.id !== id) return;
@@ -671,6 +673,124 @@ function scalGotAttached(d) {
   else scal.attach = { id, state: 'err', msg: typeof d.error === 'string' ? d.error.slice(0, 160) : 'Could not save it.' };
   scalLbPaint();
 }
+// Import many stories from an archive (Kate, 18 Nov 2026). The account's Instagram "Download your information" (JSON) lists every story with its time (stories.json: uri and creation_timestamp, in
+// seconds) beside the media files. The person picks the unzipped folder; nothing leaves the browser until Import is pressed. Each file is matched to the story posted within 2 minutes of its time (the
+// same window the database uses), only a story with no file yet is filled, and every file goes through the same trs-cal-attach as the single Attach video button, one at a time, with the dashboard's checks.
+let scalImp = null;
+const SCAL_IMP_MAX = 60 * 1024 * 1024;
+const scalImpType = n => /\.(mp4|m4v)$/i.test(n) ? 'video/mp4' : /\.mov$/i.test(n) ? 'video/quicktime' : /\.webm$/i.test(n) ? 'video/webm' : /\.jpe?g$/i.test(n) ? 'image/jpeg' : /\.png$/i.test(n) ? 'image/png' : /\.webp$/i.test(n) ? 'image/webp' : '';
+const scalImpDubai = ms => new Date(ms + 4 * 3600e3).toISOString();
+const scalImpWhen = ms => scalImpDubai(ms).replace('T', ' ').slice(0, 16);
+// A name like 1731750000.mp4 or story_1731750000123.mp4 carries its own time; used only for a file the JSON does not list.
+const scalImpNameTime = n => { const m = String(n).match(/(?:^|[^0-9])(1[5-9]\d{8}|1[5-9]\d{11})(?:[^0-9]|$)/); if (!m) return null; const v = Number(m[1]); return v > 1e12 ? v : v * 1000; };
+function scalImpOpen() { scalImp = { net: scal.sday ? scal.sday.net : 'instagram', step: 'pick', msg: '' }; scalLbTell(true); scalImpPaint(); }
+function scalImpClose() { if (scalImp) scalImp.stop = true; scalImp = null; const r = document.getElementById('scalImp'); if (r) r.remove(); scalLbTell(false); scalPaint(); }
+// Every object with a media uri and a time, wherever it sits in the JSON (the export's layout changes between versions).
+function scalImpFind(node, out, depth) {
+  if (!node || typeof node !== 'object' || depth > 8) return;
+  if (Array.isArray(node)) { node.forEach(x => scalImpFind(x, out, depth + 1)); return; }
+  const uri = typeof node.uri === 'string' ? node.uri : null;
+  const t = [node.creation_timestamp, node.taken_at, node.timestamp].find(v => typeof v === 'number' && v > 1e9);
+  if (uri && t && scalImpType(uri)) out.push({ uri, ms: t > 1e12 ? t : t * 1000 });
+  Object.keys(node).forEach(k => { if (node[k] && typeof node[k] === 'object') scalImpFind(node[k], out, depth + 1); });
+}
+// Which stories a list of {file, ms} lands on: the nearest story of that network within 2 minutes; one file per story.
+function scalImpMatch(entries, net) {
+  const res = { ready: [], has: [], none: [], big: [], dup: [] }, claimed = new Set();
+  entries.slice().sort((a, b) => a.ms - b.ms).forEach(e => {
+    const m = scalImpDubai(e.ms).slice(0, 7), label = scalImpWhen(e.ms) + ' ' + e.file.name;
+    let best = null, gap = 120001;
+    (scalStoryCache[m] || []).forEach(s => { if (s.net !== net) return; const g = Math.abs(Date.parse(s.at) - e.ms); if (g < gap) { gap = g; best = s; } });
+    if (!best) { res.none.push({ label, ms: e.ms }); return; }
+    const st = scalStatOf(best);
+    if (st && st.media) { res.has.push({ label, s: best }); return; }
+    if (claimed.has(best.at)) { res.dup.push({ label, s: best }); return; }
+    if (e.file.size > SCAL_IMP_MAX) { res.big.push({ label, size: e.file.size }); return; }
+    claimed.add(best.at); res.ready.push({ label, s: best, file: e.file, ms: e.ms });
+  });
+  return res;
+}
+function scalImpStats(m) {
+  return new Promise(res => {
+    const from = m + '-01', to = scalMonthEnd(m); let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    if (scalImp) scalImp.waitStats = { from, to, res: fin };
+    try { window.parent.postMessage({ type: 'trs-cal-need-stats', from, to }, '*'); } catch (e) { fin(); }
+    setTimeout(fin, 15000);
+  });
+}
+async function scalImpPick(inp) {
+  const files = [...(inp.files || [])]; inp.value = ''; const I = scalImp; if (!I || !files.length) return;
+  I.step = 'read'; I.msg = 'Reading ' + files.length + ' files'; scalImpPaint();
+  try {
+    const rel = f => (f.webkitRelativePath || f.name).replace(/\\/g, '/').toLowerCase();
+    const media = files.filter(f => scalImpType(f.name)), raw = [];
+    for (const f of files.filter(f => /\.json$/i.test(f.name) && /stor/i.test(f.name) && f.size < 300 * 1024 * 1024)) { try { scalImpFind(JSON.parse(await f.text()), raw, 0); } catch (e) { /* not a story list */ } }
+    const entries = [], used = new Set();
+    raw.forEach(r => {
+      const u = r.uri.replace(/\\/g, '/').toLowerCase(), base = u.split('/').pop();
+      const f = media.find(x => rel(x) === u || rel(x).endsWith('/' + u)) || media.find(x => x.name.toLowerCase() === base);
+      if (f && !used.has(f)) { used.add(f); entries.push({ file: f, ms: r.ms }); }
+    });
+    media.filter(f => !used.has(f)).forEach(f => { const ms = scalImpNameTime(f.name); if (ms) entries.push({ file: f, ms }); });
+    I.found = entries.length; I.files = files.length;
+    if (!entries.length) { I.step = 'pick'; I.msg = 'No stories with a time were found in those ' + files.length + ' files. Pick the folder that holds stories.json (usually your_instagram_activity/media) or the whole unzipped download.'; scalImpPaint(); return; }
+    const months = [...new Set(entries.map(e => scalImpDubai(e.ms).slice(0, 7)))].sort();
+    for (let i = 0; i < months.length; i++) {
+      if (scalImp !== I) return;
+      I.msg = 'Matching to the calendar: ' + months[i] + ' (' + (i + 1) + ' of ' + months.length + ')'; scalImpPaint();
+      try { await scalLoadStories(months[i]); } catch (e) { /* that month stays unmatched */ }
+      await scalImpStats(months[i]);
+    }
+    if (scalImp !== I) return;
+    I.res = scalImpMatch(entries, I.net); I.step = 'review'; I.msg = ''; scalImpPaint();
+  } catch (e) { I.step = 'pick'; I.msg = 'Could not read those files: ' + String((e && e.message) || e).slice(0, 120); scalImpPaint(); }
+}
+async function scalImpRun() {
+  const I = scalImp; if (!I || I.running || !I.res || !I.res.ready.length) return;
+  I.running = true; I.step = 'run'; I.done = 0; I.fail = []; scalImpPaint();
+  for (const it of I.res.ready) {
+    if (scalImp !== I || I.stop) break;
+    const st = scalStatOf(it.s), id = it.s.net + '|' + it.s.at, key = ((st && st.url || '').match(/\/stories\/[^/]+\/(\d+)/) || [])[1] || null;
+    const r = await new Promise(res => {
+      I.wait = { id, res }; const to = setTimeout(() => { if (I.wait && I.wait.id === id) { I.wait = null; res({ ok: false, error: 'No answer from the dashboard in 90 seconds.' }); } }, 90000);
+      const fin = res; I.wait.res = x => { clearTimeout(to); fin(x); };
+      try { window.parent.postMessage({ type: 'trs-cal-attach', net: it.s.net, at: it.s.at, key, file: it.file }, '*'); } catch (e) { I.wait = null; clearTimeout(to); res({ ok: false, error: 'Could not send the file.' }); }
+    });
+    if (r && r.ok) I.done++; else I.fail.push(it.label + ': ' + ((r && r.error) || 'failed'));
+    scalImpPaint();
+  }
+  if (scalImp !== I) return;
+  I.running = false; I.step = 'done'; scal.sasked = {}; scalAskStats(); scalImpPaint();
+}
+function scalImpPaint() {
+  const I = scalImp; if (!I) return;
+  let root = document.getElementById('scalImp');
+  if (!root) { root = document.createElement('div'); root.id = 'scalImp'; root.className = 'scal-imp'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Import stories from an archive'); document.body.appendChild(root); }
+  const R = I.res, n = k => R ? R[k].length : 0, bar = I.step === 'run' && I.res ? Math.round(100 * (I.done + I.fail.length) / Math.max(1, R.ready.length)) : 0;
+  const close = `<button type="button" class="scal-lbx scal-impx" aria-label="Close" onclick="scalImpClose()">×</button>`;
+  let body = '';
+  if (I.step === 'pick') body = `<h3>Import stories from an archive</h3>
+    <p>Which account is the archive from?
+      <label class="scal-impr"><input type="radio" name="scalImpNet" value="instagram" ${I.net === 'instagram' ? 'checked' : ''} onchange="scalImp.net='instagram'"> Instagram</label>
+      <label class="scal-impr"><input type="radio" name="scalImpNet" value="facebook" ${I.net === 'facebook' ? 'checked' : ''} onchange="scalImp.net='facebook'"> Facebook</label></p>
+    <p class="scal-imph">Instagram: Accounts Center, Your information and permissions, Download your information, choose Instagram, Stories only, format JSON, all time. Unzip what you get, then pick the unzipped folder here. Nothing is sent until you press Import.</p>
+    ${I.msg ? `<p class="scal-imperr">${mkEsc(I.msg)}</p>` : ''}
+    <label class="scal-lbbtn">Pick the folder<input type="file" webkitdirectory multiple onchange="scalImpPick(this)"></label>`;
+  else if (I.step === 'read') body = `<h3>Reading the archive</h3><p>${mkEsc(I.msg)}</p>`;
+  else if (I.step === 'review') {
+    const rows = R.ready.slice(0, 40).map(x => `<li>${mkEsc(scalImpWhen(x.ms))} Dubai <span>${mkEsc(x.file.type || scalImpType(x.file.name))}, ${Math.max(1, Math.round(x.file.size / 1048576))} MB</span></li>`).join('');
+    body = `<h3>Ready to import</h3>
+      <p class="scal-impn"><b>${n('ready')}</b> ready to attach &nbsp; <span>${n('has')} already have a file</span> &nbsp; <span>${n('none')} match no story</span>${n('big') ? ` &nbsp; <span>${n('big')} over 60 MB</span>` : ''}${n('dup') ? ` &nbsp; <span>${n('dup')} second file for a story</span>` : ''}</p>
+      ${rows ? `<ul class="scal-impl">${rows}${n('ready') > 40 ? `<li>and ${n('ready') - 40} more</li>` : ''}</ul>` : ''}
+      <p class="scal-imph">A file goes to the story posted within 2 minutes of its time. Stories that already have a file are left alone.</p>
+      <div class="scal-impa"><button type="button" class="scal-lbbtn" ${n('ready') ? '' : 'disabled'} onclick="scalImpRun()">Import ${n('ready')} file${n('ready') === 1 ? '' : 's'}</button><button type="button" class="scal-impg" onclick="scalImpClose()">Cancel</button></div>`;
+  } else if (I.step === 'run') body = `<h3>Importing</h3><p>${I.done + I.fail.length} of ${R.ready.length}. Keep this window open.</p><div class="scal-impp"><i style="width:${bar}%"></i></div>${I.fail.length ? `<p class="scal-imperr">${I.fail.length} could not be saved</p>` : ''}<div class="scal-impa"><button type="button" class="scal-impg" onclick="scalImp.stop=true">Stop after this one</button></div>`;
+  else body = `<h3>${I.stop ? 'Stopped' : 'Done'}</h3><p><b>${I.done}</b> story file${I.done === 1 ? '' : 's'} attached${I.fail.length ? `, ${I.fail.length} could not be saved` : ''}. Open a story to watch it.</p>
+      ${I.fail.length ? `<ul class="scal-impl err">${I.fail.slice(0, 12).map(x => `<li>${mkEsc(x)}</li>`).join('')}${I.fail.length > 12 ? `<li>and ${I.fail.length - 12} more</li>` : ''}</ul>` : ''}
+      <div class="scal-impa"><button type="button" class="scal-lbbtn" onclick="scalImpClose()">Close</button></div>`;
+  root.innerHTML = `<div class="scal-impbox">${I.running ? '' : close}${body}</div>`;
+}
+document.addEventListener('keydown', e => { if (scalImp && !scalImp.running && e.key === 'Escape') { e.stopImmediatePropagation(); scalImpClose(); } }, true);
 function scalLbPaint() {
   const L = scalLb; if (!L) return;
   let root = document.getElementById('scalLb');
@@ -730,7 +850,7 @@ function scalStoryPanelHtml(cols) {
       <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]} stories, ${list.length} ${scalSrcBadge({ source: 'manual' })}</span></div>
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">${list.length ? scalStoryTotals(list) + `<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
-      ${scalStoryCaption()}</div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
+      ${scalStoryCaption()}${scal.statsOk && calEmbedded ? '<p><button type="button" class="scal-impbtn" onclick="scalImpOpen()">Import many from an archive</button></p>' : ''}</div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
