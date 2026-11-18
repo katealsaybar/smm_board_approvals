@@ -378,6 +378,31 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
   .scal-lbframe.story .scal-lbtap.r{right:auto;left:calc(var(--mw)*.68)}
 }
 
+/* Attach video, in the viewer of a story that has no video (Kate, 18 Nov 2026) */
+.scal-lbat{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px}
+.scal-lbbtn{position:relative;display:inline-block;padding:8px 16px;border-radius:999px;background:#fff;color:#111;font-size:13px;font-weight:700;cursor:pointer}
+.scal-lbbtn:hover{background:#e9e9ee}
+.scal-lbbtn:focus-within{outline:2px solid #fff;outline-offset:2px}
+.scal-lbbtn input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.scal-lbat-h{font-size:11.5px;line-height:1.35;opacity:.75}
+.scal-lbat-h.err{color:#ffb4b4;opacity:1}
+
+/* Story cards in the day panel line up across a row: picture, time, the picture-only note, the numbers and the link each sit on their own shared line (Kate, 18 Nov 2026) */
+@supports (grid-template-rows:subgrid){
+  .scal-sgrid.row{row-gap:0}
+  .scal-sgrid.row .scal-story{display:grid;grid-template-rows:subgrid;grid-row:span 5;row-gap:4px;margin-bottom:14px;align-content:start}
+  .scal-sgrid.row .scal-story figcaption{display:contents}
+  .scal-sgrid.row .scal-story .scal-sth{grid-row:1}
+  .scal-sgrid.row .scal-story figcaption>b{grid-row:2}
+  .scal-sgrid.row .scal-story .scal-snote{grid-row:3}
+  .scal-sgrid.row .scal-story .scal-sstats,.scal-sgrid.row .scal-story figcaption>.scal-snone:not(.scal-snote){grid-row:4}
+  .scal-sgrid.row .scal-story .scal-slink{grid-row:5;align-self:end}
+}
+
+/* The picture in a post's panel is 9:16 and is never cropped (Kate, 18 Nov 2026). It was 4:5 and cut the bottom off. */
+.scal-pic{aspect-ratio:9/16;max-height:none;max-width:300px;background:#0b0b10}
+.scal-pic img{object-fit:contain}
+
 /* The whole caption is read inside the window (Kate, 13 Nov 2026): the player's own 'See more' leaves for Facebook or Instagram. */
 .scal-pcap.full{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
 

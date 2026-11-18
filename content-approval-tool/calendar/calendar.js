@@ -43,6 +43,8 @@ if (calEmbedded) {
       if (typeof scalPaint === 'function' && document.getElementById('scalRoot') && document.getElementById('scalRoot').children.length) scalPaint();
     } else if (e.data.type === 'trs-cal-post-stats' && typeof scal !== 'undefined') {
       scalGotPostStats(e.data);
+    } else if (e.data.type === 'trs-cal-attached' && typeof scal !== 'undefined') {
+      scalGotAttached(e.data);
     } else if (e.data.type === 'trs-cal-stories' && typeof scal !== 'undefined') {
       scalGotStats(e.data);
     } else if (e.data.type === 'trs-cal-cmd' && typeof scal !== 'undefined' && scal.ws) {
@@ -586,6 +588,7 @@ function scalGotStats(d) {
   });
   if (d.rows.length) scal.statsOk = true;
   scalPaint();
+  if (scalLb) scalLbPaint();   // an open viewer picks up a file that was just attached
 }
 function scalStatLines(st) {
   const items = SCAL_SFIELDS.filter(([k]) => st[k] !== null && st[k] !== undefined).map(([k, l]) => `<div><dt>${l}</dt><dd>${scalFmt(st[k])}</dd></div>`).join('');
@@ -594,7 +597,7 @@ function scalStatLines(st) {
 function scalStoryCard(s, cols) {
   const st = scalStatOf(s), c = cols[s.net], cur = scal.sday && scal.sday.at && scal.sday.at === s.at && scal.sday.net === s.net;
   return `<figure class="scal-story${cur ? ' cur' : ''}" data-s="${mkEsc(s.net + '|' + s.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}" onclick="scalLbOpenStory(this.dataset.s)"><div class="scal-sth"><button type="button" class="scal-splay" aria-label="Watch this story" onclick="event.stopPropagation();scalLbOpenStory(this.closest('[data-s]').dataset.s)">${SCAL_PLAY}</button>${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
-    <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')} ${scalSrcBadge({ source: 'manual' })}</b>${st && st.noFile ? `<span class="scal-snone">Picture only: ${SOC_NETS[s.net]} gave no video file</span>` : ''}${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
+    <figcaption><b><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span>${mkEsc(scalClock(s.t) || '')} ${scalSrcBadge({ source: 'manual' })}</b>${st && st.noFile ? `<span class="scal-snone scal-snote">Picture only: ${SOC_NETS[s.net]} gave no video file</span>` : ''}${st ? scalStatLines(st) : (scal.statsOk ? '<span class="scal-snone">No numbers kept for this story</span>' : '')}${st && st.url ? `<a class="scal-slink" href="${mkEsc(st.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Works for 24 hours after it was posted">Open on ${SOC_NETS[s.net]}</a>` : ''}</figcaption></figure>`;
 }
 function scalStoryTotals(list) {
   const tot = {}, got = list.map(scalStatOf).filter(Boolean);
@@ -604,7 +607,7 @@ function scalStoryTotals(list) {
 }
 function scalStoryCaption() {
   return scal.statsOk
-    ? '<p class="scal-pcap">Story numbers come from Metricool and show here because you are signed in to the dashboard. Instagram and Facebook do not offer a player for stories, so a story shows as its picture; the link opens it while it is still live, for 24 hours.</p>'
+    ? '<p class="scal-pcap">Story numbers come from Metricool and show here because you are signed in to the dashboard. Stories saved since 12 Nov 2026 play here. Earlier ones, and stories with copyrighted music, show as a picture because Instagram and Facebook keep a story for 24 hours and hand over no file for music; the link opens a story while it is still live. Open a story and use Attach video to add its file from the archive.</p>'
     : '<p class="scal-pcap">Pictures and times only. Story numbers (views, reach, replies, taps) are private, so they are not shown on this page.</p>';
 }
 // The viewer (Kate, 13 Nov 2026): double-click a story or a post (or press the play sign on a story) and it opens in its own window in the Instagram story style:
@@ -638,6 +641,36 @@ function scalLbGo(d) {
   if (n >= scalLb.items.length) { scalLbClose(); return; }
   scalLbStop(); scalLb.i = n; scalLb.el = 0; scalLbPaint();
 }
+// Attach a story's file by hand (Kate, 18 Nov 2026). Stories before 12 Nov were never copied, and Instagram gives no file for a story with copyrighted music, but the account's own
+// Stories Archive still has them. In the viewer, a story with no video shows Attach video (only when the dashboard sent its numbers, so a signed-in Level 3 or higher): the file goes to
+// the dashboard (trs-cal-attach), which saves it and ties it to this story, answers trs-cal-attached, and the numbers are asked again so the video plays at once.
+function scalAttachHtml(s, st, L) {
+  if (!calEmbedded || !scal.statsOk || !st || L.video) return '';
+  const a = scal.attach && scal.attach.id === s.net + '|' + s.at ? scal.attach : null;
+  if (a && a.state === 'up') return '<div class="scal-lbat"><span class="scal-lbat-h">Uploading. Keep this window open.</span></div>';
+  if (a && a.state === 'ok') return '<div class="scal-lbat"><span class="scal-lbat-h">Saved. Loading the video.</span></div>';
+  const err = a && a.state === 'err';
+  return `<div class="scal-lbat"><label class="scal-lbbtn" onclick="if(scalLb)scalLb.paused=true">Attach video<input type="file" accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp" onchange="scalAttach(this)"></label><span class="scal-lbat-h${err ? ' err' : ''}">${err ? mkEsc(a.msg) : 'From the story archive or the phone it was filmed on. MP4, MOV or WebM, up to 60 MB.'}</span></div>`;
+}
+function scalAttach(inp) {
+  const f = inp.files && inp.files[0]; inp.value = '';
+  const L = scalLb, it = L && L.items[L.i]; if (!f || !it || it.k !== 'story') return;
+  const s = it.s, st = scalStatOf(s), id = s.net + '|' + s.at;
+  const fail = msg => { scal.attach = { id, state: 'err', msg }; scalLbPaint(); };
+  if (!/^(video\/(mp4|quicktime|webm)|image\/(jpeg|png|webp))$/.test(f.type)) return fail('Use an MP4, MOV or WebM video, or a JPG, PNG or WebP picture.');
+  if (f.size > 60 * 1024 * 1024) return fail('That file is over 60 MB. Trim or compress it first.');
+  const key = ((st && st.url || '').match(/\/stories\/[^/]+\/(\d+)/) || [])[1] || null;
+  scal.attach = { id, state: 'up' }; scalLbPaint();
+  try { window.parent.postMessage({ type: 'trs-cal-attach', net: s.net, at: s.at, key, file: f }, '*'); } catch (e) { fail('Could not send the file to the dashboard.'); }
+}
+function scalGotAttached(d) {
+  if (!d || !scal.attach) return;
+  const id = d.net + '|' + d.at;
+  if (scal.attach.id !== id) return;
+  if (d.ok === true) { scal.attach = { id, state: 'ok' }; scal.sasked = {}; scalAskStats(); }
+  else scal.attach = { id, state: 'err', msg: typeof d.error === 'string' ? d.error.slice(0, 160) : 'Could not save it.' };
+  scalLbPaint();
+}
 function scalLbPaint() {
   const L = scalLb; if (!L) return;
   let root = document.getElementById('scalLb');
@@ -655,7 +688,7 @@ function scalLbPaint() {
       <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span><b>tararosesalon</b><span>${mkEsc(when)}</span></div>
       <div class="scal-lbmedia">${media}</div>
       <button type="button" class="scal-lbtap l" aria-label="Previous" onclick="scalLbGo(-1)"></button><button type="button" class="scal-lbtap r" aria-label="Next" onclick="scalLbGo(1)"></button>
-      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}</div></div>`;
+      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}${scalAttachHtml(s, st, L)}</div></div>`;
   } else {
     const p = it.p, e = scalEmbedUrl(p), c = cols[p.net];
     inner = `<div class="scal-lbframe post" style="--c:${c};--bf:${scalBadgeFg(c)}">
@@ -672,7 +705,7 @@ function scalLbPaint() {
   const bar = root.querySelector('.scal-lbbars i.cur b'), v = root.querySelector('video'), frame = root.querySelector('.scal-lbframe');
   if (v) { v.ontimeupdate = () => { if (bar && v.duration) bar.style.width = (100 * v.currentTime / v.duration) + '%'; }; v.onended = () => scalLbGo(1); return; }
   frame.onmouseenter = () => { L.paused = true; }; frame.onmouseleave = () => { L.paused = false; };
-  L.timer = setInterval(() => { if (L.paused) return; L.el += 50; if (bar) bar.style.width = Math.min(100, 100 * L.el / L.dur) + '%'; if (L.el >= L.dur) scalLbGo(1); }, 50);
+  L.timer = setInterval(() => { if (L.paused || (scal.attach && scal.attach.state === 'up')) return; L.el += 50; if (bar) bar.style.width = Math.min(100, 100 * L.el / L.dur) + '%'; if (L.el >= L.dur) scalLbGo(1); }, 50);
 }
 document.addEventListener('keydown', e => {
   if (!scalLb) return;
