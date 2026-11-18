@@ -272,6 +272,7 @@ function scalPaint() {
     </div>
     <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories show when the Stories chip is on, as a picture and the time (${scal.statsOk ? 'their numbers show because you are signed in to the dashboard' : 'story numbers are private, so none are shown'}). Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
   if (scal.sel) { const c = root.querySelector('.scal-close'); if (c && scal.focusPanel) { c.focus(); scal.focusPanel = false; } }
+  scalLbTell(); scalReportHeight();
 }
 
 // Week: hours down the side, a column a day. Posts in the same hour stack inside their cell, so nothing is squashed side by side.
@@ -631,7 +632,25 @@ function scalLbOpenPost(p) {
 // The viewer sits inside the dashboard's frame, and that frame is taller than the screen, so a viewer centred in it ran off the bottom of the window
 // (Kate, 18 Nov 2026). While it is open the page tells the dashboard (trs-cal-lb), which stretches the frame over the whole window and puts it back on close.
 // A page opened on its own has no parent to tell; an older dashboard ignores the message and the viewer behaves as before.
-function scalLbTell(open) { try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'trs-cal-lb', open: !!open }, '*'); } catch (e) {} }
+// Whether the frame must cover the window is worked out here, not passed in: a viewer, the import window, or a day or post panel (all fixed to the frame's own viewport) need it; the plain calendar does not.
+let scalTold = false, scalHSent = 0, scalHRaf = 0;
+function scalLbTell() {
+  let want = false;
+  try { want = !!(scalLb || scalImp || (typeof scal !== 'undefined' && (scal.sel || scal.sday))); } catch (e) { want = !!scalLb; }
+  if (want === scalTold) return; scalTold = want;
+  try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'trs-cal-lb', open: want }, '*'); } catch (e) {}
+}
+// The frame's height follows the calendar (Kate, 18 Nov 2026), so the dashboard's own page scrolls and the whole month shows, not a short box with a second scroll inside it.
+// The page tells the dashboard how tall its content is (trs-cal-h); the dashboard sets the frame to that. On its own address nothing is sent.
+function scalReportHeight() {
+  if (!calEmbedded || scalHRaf) return;
+  scalHRaf = setTimeout(() => {   // a timer, not requestAnimationFrame: that one never runs while the tab is in the background
+    scalHRaf = 0; const w = document.querySelector('.wrap'); if (!w) return;
+    const h = Math.ceil(w.getBoundingClientRect().height); if (h === scalHSent || h < 200) return;
+    scalHSent = h; try { window.parent.postMessage({ type: 'trs-cal-h', h }, '*'); } catch (e) {}
+  }, 40);
+}
+if (calEmbedded && window.ResizeObserver) { const w = document.querySelector('.wrap'); if (w) new ResizeObserver(scalReportHeight).observe(w); }
 function scalLbStart(items, i) { scalLbStop(); scalLb = { items, i, el: 0, dur: 5000, paused: false, timer: null }; scalLbTell(true); scalLbPaint(); }
 function scalLbStop() { if (scalLb && scalLb.timer) clearInterval(scalLb.timer); }
 function scalLbClose() { scalLbStop(); scalLb = null; const r = document.getElementById('scalLb'); if (r) r.remove(); scalLbTell(false); }
