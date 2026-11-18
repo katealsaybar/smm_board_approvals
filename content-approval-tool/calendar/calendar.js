@@ -624,9 +624,13 @@ function scalLbOpenPost(p) {
   if (i < 0) { if (calSafeUrl(p.url)) window.open(calSafeUrl(p.url), '_blank', 'noopener'); return; }
   scalLbStart(list.map(x => ({ k: 'post', p: x })), i);
 }
-function scalLbStart(items, i) { scalLbStop(); scalLb = { items, i, el: 0, dur: 5000, paused: false, timer: null }; scalLbPaint(); }
+// The viewer sits inside the dashboard's frame, and that frame is taller than the screen, so a viewer centred in it ran off the bottom of the window
+// (Kate, 18 Nov 2026). While it is open the page tells the dashboard (trs-cal-lb), which stretches the frame over the whole window and puts it back on close.
+// A page opened on its own has no parent to tell; an older dashboard ignores the message and the viewer behaves as before.
+function scalLbTell(open) { try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'trs-cal-lb', open: !!open }, '*'); } catch (e) {} }
+function scalLbStart(items, i) { scalLbStop(); scalLb = { items, i, el: 0, dur: 5000, paused: false, timer: null }; scalLbTell(true); scalLbPaint(); }
 function scalLbStop() { if (scalLb && scalLb.timer) clearInterval(scalLb.timer); }
-function scalLbClose() { scalLbStop(); scalLb = null; const r = document.getElementById('scalLb'); if (r) r.remove(); }
+function scalLbClose() { scalLbStop(); scalLb = null; const r = document.getElementById('scalLb'); if (r) r.remove(); scalLbTell(false); }
 function scalLbGo(d) {
   if (!scalLb) return;
   const n = scalLb.i + d;

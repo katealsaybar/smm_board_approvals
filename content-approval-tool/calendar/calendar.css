@@ -348,6 +348,35 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-lbcount{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.7);pointer-events:none}
 @media(max-width:560px){.scal-lbn{position:absolute;bottom:14px;width:40px;height:40px}.scal-lbn.prev{left:14px}.scal-lbn.next{right:14px}.scal-lbframe,.scal-lbframe.post{width:calc(100vw - 16px);height:min(80vh,760px)}}
 
+/* Viewer sizing (Kate, 18 Nov 2026). The whole 9:16 picture shows: the name bar sits above it and the numbers under it, nothing lies on top of it.
+   The frame takes the height of the window (the dashboard stretches the frame over the window while the viewer is open, see scalLbTell). */
+.scal-lbframe.story{--H:min(calc(100vh - 28px),940px);--hd:54px;--ft:132px;height:var(--H);width:calc((var(--H) - var(--hd) - var(--ft))*9/16);min-width:min(240px,calc(100vw - 16px));max-width:calc(100vw - 112px);background:#0b0b10}
+.scal-lbframe.story .scal-lbbars{position:static;flex:none;height:3px;margin:10px 12px 0}
+.scal-lbframe.story .scal-lbhd{position:static;flex:none;height:24px;margin:8px 12px 9px}
+.scal-lbframe.story .scal-lbmedia{position:relative;inset:auto;flex:1;min-height:0}
+.scal-lbframe.story .scal-lbtap{top:var(--hd);bottom:calc(var(--ft) + 52px)}
+.scal-lbframe.story .scal-lbft{position:static;flex:none;height:var(--ft);box-sizing:border-box;padding:10px 14px;background:#0b0b10;overflow:auto;gap:4px}
+.scal-lbframe.story .scal-lbft .scal-sstats{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+.scal-lbframe.post{width:min(520px,calc(100vw - 112px));height:min(calc(100vh - 28px),960px)}
+.scal-lbframe.post .scal-lbcap{max-height:5.5em}
+.scal-lbframe.post .scal-lbmedia iframe{min-height:0}
+@media(max-width:560px){
+  .scal-lbframe.story{--H:calc(100vh - 76px);width:calc(100vw - 16px);max-width:none}
+  .scal-lbframe.post{width:calc(100vw - 16px);height:calc(100vh - 76px)}
+}
+/* On a wide window the numbers go beside the picture, not under it, so the picture gets the whole height of the window. Narrow windows keep them underneath. */
+@media(min-width:760px){
+  .scal-lbframe.story{--mw:min(calc((var(--H) - var(--hd))*9/16),calc(100vw - 362px));display:grid;grid-template-columns:var(--mw) 250px;grid-template-rows:auto auto minmax(0,1fr);width:calc(var(--mw) + 250px);min-width:0;max-width:none}
+  .scal-lbframe.story .scal-lbbars{grid-column:1;grid-row:1}
+  .scal-lbframe.story .scal-lbhd{grid-column:1;grid-row:2}
+  .scal-lbframe.story .scal-lbmedia{grid-column:1;grid-row:3}
+  .scal-lbframe.story .scal-lbft{grid-column:2;grid-row:1/4;height:auto;padding:18px 16px;border-left:1px solid rgba(255,255,255,.1);gap:12px}
+  .scal-lbframe.story .scal-lbft .scal-sstats{grid-template-columns:1fr;gap:7px;font-size:13px}
+  .scal-lbframe.story .scal-lbtap{top:var(--hd);bottom:52px;width:calc(var(--mw)*.32)}
+  .scal-lbframe.story .scal-lbtap.l{left:0}
+  .scal-lbframe.story .scal-lbtap.r{right:auto;left:calc(var(--mw)*.68)}
+}
+
 /* The whole caption is read inside the window (Kate, 13 Nov 2026): the player's own 'See more' leaves for Facebook or Instagram. */
 .scal-pcap.full{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
 
