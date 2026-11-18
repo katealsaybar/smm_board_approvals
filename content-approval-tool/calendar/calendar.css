@@ -308,6 +308,15 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-splay svg{width:16px;height:16px;fill:currentColor}
 .scal-splay:hover{background:rgba(0,0,0,.85)}
 .scal-story{cursor:pointer}
+/* Story card: lifts and lights its edges on hover, one click plays it (Kate, 18 Nov 2026) */
+.scal-story{transition:transform .18s ease}
+.scal-story .scal-sth{transition:box-shadow .18s ease}
+@media(hover:hover){
+  .scal-story:hover{transform:translateY(-5px)}
+  .scal-story:hover .scal-sth{box-shadow:0 0 0 2px var(--c),0 0 16px 3px color-mix(in srgb,var(--c) 60%,transparent),0 10px 22px rgba(0,0,0,.28)}
+}
+.scal-story:focus-within .scal-sth{box-shadow:0 0 0 2px var(--c),0 0 16px 3px color-mix(in srgb,var(--c) 60%,transparent)}
+@media(prefers-reduced-motion:reduce){.scal-story,.scal-story .scal-sth{transition:none}.scal-story:hover{transform:none}}
 .scal-lb{position:fixed;inset:0;z-index:1000;background:rgba(8,8,12,.92);display:flex;align-items:center;justify-content:center;gap:12px;padding:12px}
 .scal-lbframe{position:relative;width:min(380px,calc(100vw - 120px));height:min(88vh,calc((100vw - 120px)*16/9),676px);background:#000;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;color:#fff}
 .scal-lbframe.post{width:min(440px,calc(100vw - 120px));height:min(92vh,760px);background:var(--surface);color:var(--text)}
