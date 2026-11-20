@@ -699,8 +699,11 @@ function scalAttachHtml(s, st, L) {
   const err = a && a.state === 'err';
   return `<div class="scal-lbat"><label class="scal-lbbtn" onclick="if(scalLb)scalLb.paused=true">Attach video<input type="file" accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp" onchange="scalAttach(this)"></label><span class="scal-lbat-h${err ? ' err' : ''}">${err ? mkEsc(a.msg) : 'From the story archive or the phone it was filmed on. MP4, MOV or WebM, up to 60 MB.'}</span></div>`;
 }
-function scalAttach(inp) {
-  const f = inp.files && inp.files[0]; inp.value = '';
+// Kate, 20 Nov 2026: Attach video said "Failed to fetch". The picked File was sent to the dashboard still pointing at the file on disk, and the dashboard (another site) then had to read it
+// itself. The frame now reads the bytes first and sends an in-memory copy, so nothing depends on the disk file or on this frame's file box any more.
+async function scalMemFile(f) { return new Blob([await f.arrayBuffer()], { type: f.type }); }
+async function scalAttach(inp) {
+  const f = inp.files && inp.files[0], bytes = f ? scalMemFile(f) : null; inp.value = '';
   const L = scalLb, it = L && L.items[L.i]; if (!f || !it || it.k !== 'story') return;
   const s = it.s, st = scalStatOf(s), id = s.net + '|' + s.at;
   const fail = msg => { scal.attach = { id, state: 'err', msg }; scalLbPaint(); };
@@ -708,7 +711,8 @@ function scalAttach(inp) {
   if (f.size > 60 * 1024 * 1024) return fail('That file is over 60 MB. Trim or compress it first.');
   const key = ((st && st.url || '').match(/\/stories\/[^/]+\/(\d+)/) || [])[1] || null;
   scal.attach = { id, state: 'up' }; scalLbPaint();
-  try { window.parent.postMessage({ type: 'trs-cal-attach', net: s.net, at: s.at, key, file: f }, '*'); } catch (e) { fail('Could not send the file to the dashboard.'); }
+  let blob; try { blob = await bytes; } catch (e) { return fail('That file could not be read. Copy it to the Desktop and pick it from there.'); }
+  try { window.parent.postMessage({ type: 'trs-cal-attach', net: s.net, at: s.at, key, file: blob }, '*'); } catch (e) { fail('Could not send the file to the dashboard.'); }
 }
 function scalGotAttached(d) {
   if (scalImp && scalImp.wait && d && d.net + '|' + d.at === scalImp.wait.id) { const w = scalImp.wait; scalImp.wait = null; w.res(d); return; }
@@ -800,7 +804,8 @@ async function scalImpRun() {
     const r = await new Promise(res => {
       I.wait = { id, res }; const to = setTimeout(() => { if (I.wait && I.wait.id === id) { I.wait = null; res({ ok: false, error: 'No answer from the dashboard in 90 seconds.' }); } }, 90000);
       const fin = res; I.wait.res = x => { clearTimeout(to); fin(x); };
-      try { window.parent.postMessage({ type: 'trs-cal-attach', net: it.s.net, at: it.s.at, key, file: it.file }, '*'); } catch (e) { I.wait = null; clearTimeout(to); res({ ok: false, error: 'Could not send the file.' }); }
+      scalMemFile(it.file).then(blob => { window.parent.postMessage({ type: 'trs-cal-attach', net: it.s.net, at: it.s.at, key, file: blob }, '*'); })
+        .catch(() => { I.wait = null; clearTimeout(to); res({ ok: false, error: 'Could not read or send the file.' }); });
     });
     if (r && r.ok) I.done++; else I.fail.push(it.label + ': ' + ((r && r.error) || 'failed'));
     scalImpPaint();
