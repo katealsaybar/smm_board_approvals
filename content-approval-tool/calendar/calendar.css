@@ -478,3 +478,11 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-fhint{margin:8px 0 0;font-size:12px;color:var(--muted2)}
 .scal-schip .scal-sd{width:6px;height:6px;box-shadow:none;margin-left:1px}
 .scal-story figcaption .scal-src{margin-left:2px}
+
+/* Download button in a story's viewer (Kate, 20 Nov 2026) */
+.scal-lbdl{display:inline-flex;align-items:center;gap:10px;align-self:flex-start;margin-top:6px;padding:6px 18px 6px 6px;border:0;border-radius:999px;background:#fff;color:#111;font-family:inherit;font-size:13px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .15s,box-shadow .15s,background .15s}
+.scal-lbdl .ic{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--c,#111);color:var(--bf,#fff)}
+.scal-lbdl:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.45);background:#f4f4f7}
+.scal-lbdl:active:not(:disabled){transform:translateY(0)}
+.scal-lbdl:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.scal-lbdl:disabled{opacity:.75;cursor:progress}

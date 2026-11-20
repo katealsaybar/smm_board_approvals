@@ -664,6 +664,33 @@ function scalLbGo(d) {
 // Attach a story's file by hand (Kate, 18 Nov 2026). Stories before 12 Nov were never copied, and Instagram gives no file for a story with copyrighted music, but the account's own
 // Stories Archive still has them. In the viewer, a story with no video shows Attach video (only when the dashboard sent its numbers, so a signed-in Level 3 or higher): the file goes to
 // the dashboard (trs-cal-attach), which saves it and ties it to this story, answers trs-cal-attached, and the numbers are asked again so the video plays at once.
+// Download a story's file (Kate, 20 Nov 2026). The button saves what the viewer is showing: the saved video, or the picture when there is no video.
+function scalDlHtml(s, st) {
+  const url = (st && st.media) || s.img; if (!url) return '';
+  const vid = !!(st && st.media && st.isVideo);
+  return `<button type="button" class="scal-lbdl" onclick="scalSaveStory(this)"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></span><span class="tx">Download ${vid ? 'video' : 'picture'}</span></button>`;
+}
+async function scalSaveStory(btn) {
+  const L = scalLb, it = L && L.items[L.i]; if (!it || it.k !== 'story' || btn.disabled) return;
+  const s = it.s, st = scalStatOf(s), url = (st && st.media) || s.img; if (!url) return;
+  const tx = btn.querySelector('.tx'), was = tx.textContent, pad = n => String(n).padStart(2, '0');
+  const name = 'tararosesalon-' + s.net + '-story-' + s.date + (s.t ? '-' + pad(s.t.h) + pad(s.t.m) : '');
+  btn.disabled = true; tx.textContent = 'Saving...';
+  try {
+    const r = await fetch(url, { referrerPolicy: 'no-referrer' }); if (!r.ok) throw new Error('http ' + r.status);
+    const b = await r.blob(), mt = (b.type || '').toLowerCase();
+    const ext = /mp4/.test(mt) ? 'mp4' : /quicktime/.test(mt) ? 'mov' : /webm/.test(mt) ? 'webm' : /png/.test(mt) ? 'png' : /webp/.test(mt) ? 'webp' : /jpe?g/.test(mt) ? 'jpg' : (st && st.isVideo ? 'mp4' : 'jpg');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name + '.' + ext; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    tx.textContent = 'Saved';
+  } catch (e) {
+    // The file's host will not let the page read it (a Metricool picture): open it instead, so it can be saved from there.
+    const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; document.body.appendChild(a); a.click(); a.remove();
+    calToast('Opened in a new tab. Right-click it and choose Save image as.');
+    tx.textContent = was;
+  }
+  setTimeout(() => { if (btn.isConnected) { btn.disabled = false; tx.textContent = was; } }, 1800);
+}
 function scalAttachHtml(s, st, L) {
   if (!calEmbedded || !scal.statsOk || !st || L.video) return '';
   const a = scal.attach && scal.attach.id === s.net + '|' + s.at ? scal.attach : null;
@@ -827,7 +854,7 @@ function scalLbPaint() {
       <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${SCAL_CODE[s.net]}</span><b>tararosesalon</b><span>${mkEsc(when)}</span></div>
       <div class="scal-lbmedia">${media}</div>
       <button type="button" class="scal-lbtap l" aria-label="Previous" onclick="scalLbGo(-1)"></button><button type="button" class="scal-lbtap r" aria-label="Next" onclick="scalLbGo(1)"></button>
-      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}${scalAttachHtml(s, st, L)}</div></div>`;
+      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}${scalDlHtml(s, st)}${scalAttachHtml(s, st, L)}</div></div>`;
   } else {
     const p = it.p, e = scalEmbedUrl(p), c = cols[p.net];
     inner = `<div class="scal-lbframe post" style="--c:${c};--bf:${scalBadgeFg(c)}">
