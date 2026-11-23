@@ -607,3 +607,20 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
   .scal-answer{font-size:15px;padding:10px 12px;gap:10px}
   .scal-answer>div:first-child{font-size:16px}
 }
+/* Phone, second pass (Kate, 23 Nov 2026: "too narrow sa baba and too chinky sa taas"): the page's own title is not repeated inside the dashboard, the month bar is one tidy row
+   (previous, the month, next) and a second row (Today and the four views), and the calendar uses the whole width so the bars do not squeeze. */
+@media(max-width:720px),(pointer:coarse) and (max-width:1100px){
+  .embedded .head{display:none}
+  .embedded .wrap{padding-left:2px;padding-right:2px;padding-top:2px}
+  .scal-bar-wrap,#scalRoot{margin-top:6px!important}
+  .scal-month{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .scal-month h3{flex:1 1 150px;min-width:0;text-align:center;font-size:19px;line-height:1.2}
+  .scal-month .scal-icon{flex:none}
+  .scal-month::after{content:"";order:4;flex:0 0 100%;height:0;margin:-4px 0}
+  .scal-month>:nth-child(1){order:1}.scal-month>:nth-child(2){order:2}.scal-month>:nth-child(3){order:3}.scal-month>:nth-child(4){order:5}.scal-month>:nth-child(5){order:6}
+  .scal-month>.sc-btn{flex:none;min-height:44px}
+  .scal-month .scal-seg{flex:1 1 0;min-width:0;display:flex}
+  .scal-month .scal-seg button{flex:1;padding:0 4px;font-size:14px}
+  .scal-cell{padding:3px 1px}
+  .scal-dow div{padding:8px 0}
+}
