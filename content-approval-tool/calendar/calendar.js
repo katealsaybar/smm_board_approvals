@@ -277,7 +277,7 @@ function scalPaint() {
     ${late.length ? `<p class="scal-note">${late.map(n => `${SOC_NETS[n]} has no posts on record before ${SCAL_MONTHS_NAMED[SCAL_START[n]] || SCAL_START[n]}`).join('. ')}.</p>` : ''}
     <div class="scal-layout${scal.sel || scal.sday ? ' open' : ''}">
       <div class="scal-cal">${body}</div>
-      ${scal.sday ? scalStoryPanelHtml(cols) : scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
+      ${scal.sday ? (scal.sday.slot ? scalSlotPanelHtml(cols) : scalStoryPanelHtml(cols)) : scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
     </div>
     <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories show when the Stories chip is on, as a picture and the time (${scal.statsOk ? 'their numbers show because you are signed in to the dashboard' : 'story numbers are private, so none are shown'}). Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
   if (scal.sel) { const c = root.querySelector('.scal-close'); if (c && scal.focusPanel) { c.focus(); scal.focusPanel = false; } }
@@ -307,7 +307,7 @@ function scalWeekHtml(posts, cols, per, today) {
   let g = '<div class="scal-dh c0"></div>' + days.map(d => `<div class="scal-dh${d === today ? ' today' : ''}"><b>${mkD(d).toLocaleDateString('en-GB', { weekday: 'short' })}</b><span class="n">${mkD(d).getDate()}</span></div>`).join('');
   if (unknown.length || sUnknown.length) g += '<div class="scal-hl">Time not known</div>' + days.map(d => `<div class="scal-hc l0">${unknown.filter(p => p.date === d).map(p => scalTile(p, cols, 'tc')).join('')}${scalStoryChips(sUnknown.filter(x => x.date === d), cols)}</div>`).join('');
   for (let h = h0; h <= h1; h++) {
-    g += `<div class="scal-hl">${scalHour(h)}</div>` + days.map((d, i) => `<div class="scal-hc l${best ? best(i, h) : 0}">${(cell[d + '|' + h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${scalStoryChips(scell[d + '|' + h] || [], cols)}</div>`).join('');
+    g += `<div class="scal-hl">${scalHour(h)}</div>` + days.map((d, i) => `<div class="scal-hc l${best ? best(i, h) : 0}"${scalSlotAttr(i, h)}>${(cell[d + '|' + h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${scalStoryChips(scell[d + '|' + h] || [], cols)}</div>`).join('');
   }
   // Phone: one block a day, no hour grid.
   const stacked = days.map(d => { const list = posts.filter(p => p.date === d);
@@ -329,7 +329,7 @@ function scalDayHtml(posts, cols, per, today) {
   sKnown.forEach(x => { (scell[x.t.h] = scell[x.t.h] || []).push(x); });
   let g = '';
   if (unknown.length || sUnknown.length) g += '<div class="scal-hl">Time not known</div><div class="scal-hc l0">' + unknown.map(p => scalTile(p, cols, 'tc')).join('') + sUnknown.map(x => scalStoryCard(x, cols)).join('') + '</div>';
-  for (let h = h0; h <= h1; h++) g += `<div class="scal-hl">${scalHour(h)}</div><div class="scal-hc l${best ? best(dow, h) : 0}">${(cell[h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${(scell[h] || []).map(x => scalStoryCard(x, cols)).join('')}</div>`;
+  for (let h = h0; h <= h1; h++) g += `<div class="scal-hl">${scalHour(h)}</div><div class="scal-hc l${best ? best(dow, h) : 0}"${scalSlotAttr(dow, h)}>${(cell[h] || []).map(p => scalTile(p, cols, 'tc')).join('')}${(scell[h] || []).map(x => scalStoryCard(x, cols)).join('')}</div>`;
   // Phone: the day in time order, posts and stories mixed, no hour grid.
   const mixed = posts.map(p => ({ at: p.at || p.date, html: scalTile(p, cols, 'wc') })).concat(stories.map(x => ({ at: x.at || x.date, html: scalStoryCard(x, cols) }))).sort((a, b) => a.at < b.at ? -1 : 1);
   const stacked = `<div class="scal-wcol${d === today ? ' today' : ''}">${mixed.map(m => m.html).join('')}</div>`;
@@ -865,7 +865,7 @@ const scalImpDubai = ms => new Date(ms + 4 * 3600e3).toISOString();
 const scalImpWhen = ms => scalImpDubai(ms).replace('T', ' ').slice(0, 16);
 // A name like 1731750000.mp4 or story_1731750000123.mp4 carries its own time; used only for a file the JSON does not list.
 const scalImpNameTime = n => { const m = String(n).match(/(?:^|[^0-9])(1[5-9]\d{8}|1[5-9]\d{11})(?:[^0-9]|$)/); if (!m) return null; const v = Number(m[1]); return v > 1e12 ? v : v * 1000; };
-function scalImpOpen() { scalImp = { net: scal.sday ? scal.sday.net : 'instagram', step: 'pick', msg: '' }; scalLbTell(true); scalImpPaint(); }
+function scalImpOpen() { scalImp = { net: scal.sday && scal.sday.net ? scal.sday.net : 'instagram', step: 'pick', msg: '' }; scalLbTell(true); scalImpPaint(); }
 function scalImpClose() { if (scalImp) scalImp.stop = true; scalImp = null; const r = document.getElementById('scalImp'); if (r) r.remove(); scalLbTell(false); scalPaint(); }
 // Every object with a media uri and a time, wherever it sits in the JSON (the export's layout changes between versions).
 function scalImpFind(node, out, depth) {
@@ -1035,6 +1035,56 @@ function scalStoryPanelHtml(cols) {
       <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
     <div class="scal-pb">${list.length ? scalStoryTotals(list) + `<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${tiles}</div>` : '<div class="scal-empty">No stories this day.</div>'}
       ${scalStoryCaption()}${scal.statsOk && calEmbedded ? '<p><button type="button" class="scal-impbtn" onclick="scalImpOpen()">Import many from an archive</button></p>' : ''}</div><div class="scal-cue" aria-hidden="true"><span>Scroll for more</span></div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
+}
+
+// ────────────────────────────────────────────────────────────────────────────────────
+// An hour of the week (Kate, 23 Nov 2026): the blue behind the hours is Metricool's best time to post, a weekday and an hour at a time. A click on an hour (Week or Daily)
+// opens what we actually put out at that hour of that weekday over the last 30 days, the same 30 days the blue is made from, so the shade can be checked against the posts and stories.
+// It is a window of the same kind as the post and story ones. scal.sday = { slot: true, dow, h } so closing, Escape and moving to another week all work as they do for the story window.
+// ────────────────────────────────────────────────────────────────────────────────────
+const SCAL_DOW = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
+const SCAL_RATE = ['Metricool has no rating for this hour.', 'Metricool rates this hour as an OK time to post.', 'Metricool rates this hour as a good time to post.', 'Metricool rates this hour as one of the best times to post.'];
+function scalSlotAttr(dow, h) {
+  const lbl = `${SCAL_DOW[dow]} at ${scalHour(h)}: open the posts and stories from this hour in the last 30 days`;
+  return ` data-slot="${dow}|${h}" role="button" tabindex="0" aria-label="${mkEsc(lbl)}" title="${mkEsc(lbl)}" onclick="scalSlotClick(event,${dow},${h})" onkeydown="scalSlotKey(event,${dow},${h})"`;
+}
+function scalSlotClick(e, dow, h) { if (e.target.closest('button,a')) return; scalSlotOpen(dow, h); }
+function scalSlotKey(e, dow, h) { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); scalSlotOpen(dow, h); } }
+const scalSlotWindow = () => { const t = scalToday(); return { from: scalAdd(t, -29), to: t }; };
+const scalDowOf = iso => (mkD(iso).getDay() + 6) % 7;
+async function scalSlotOpen(dow, h) {
+  const me = scal.sday = { slot: true, dow, h, busy: true, err: false };
+  scal.sel = null; scal.focusPanel = true; scalPaint();
+  const w = scalSlotWindow(), keys = [...new Set([w.from.slice(0, 7), w.to.slice(0, 7)])];
+  try { await Promise.all(keys.map(scalLoad)); await Promise.all(keys.map(scalLoadStories)); }
+  catch (e) { console.error(e); me.err = true; }
+  me.busy = false;
+  if (calEmbedded && !scal.sasked[w.from + '|' + w.to]) { scal.sasked[w.from + '|' + w.to] = true; try { window.parent.postMessage({ type: 'trs-cal-need-stats', from: w.from, to: w.to }, '*'); } catch (e) {} }
+  if (scal.sday === me) scalPaint();
+}
+// What was posted at this weekday and hour in the window, with the platform, kind and "how" filters the calendar has on. Stories follow the platforms and the by-hand filter, whether or not the Stories chip is on.
+function scalSlotItems(dow, h) {
+  const w = scalSlotWindow(), keys = [...new Set([w.from.slice(0, 7), w.to.slice(0, 7)])];
+  const inSlot = x => x.t && x.t.h === h && x.date >= w.from && x.date <= w.to && scalDowOf(x.date) === dow;
+  const posts = keys.flatMap(k => scalCache[k] || []).filter(p => inSlot(p) && scal.on[p.net] && scal.kinds[scalKindKey(p)] && (scal.src === 'all' || p.source === scal.src)).sort(scalByAt);
+  const stories = keys.flatMap(k => scalStoryCache[k] || []).filter(x => inSlot(x) && scal.on[x.net] && (scal.src === 'all' || scal.src === 'manual')).sort(scalByAt);
+  return { posts, stories, w };
+}
+function scalSlotPanelHtml(cols) {
+  const { dow, h, busy, err } = scal.sday, best = scalBest(), lvl = best ? best(dow, h) : 0;
+  const { posts, stories, w } = scalSlotItems(dow, h);
+  const range = `${scalShort(w.from)} to ${scalShort(w.to)}`;
+  const verdict = best ? `<div class="scal-verdict${lvl === 3 ? ' up' : ''}">${SCAL_RATE[lvl]}</div>` : '';
+  const said = busy ? 'Loading the last 30 days…' : err ? 'The last 30 days did not load. Close this and try again.'
+    : `<b>${posts.length} post${posts.length === 1 ? '' : 's'}</b> and <b>${stories.length} stor${stories.length === 1 ? 'y' : 'ies'}</b> went out on ${SCAL_DOW[dow]} at ${scalHour(h)} in the last 30 days (${range}).`;
+  const list = posts.length ? `<div><div class="scal-sec">Posts</div><div class="scal-slotlist">${posts.map(p => scalTile(p, cols, 'wc')).join('')}</div></div>` : '';
+  const sto = stories.length ? `<div><div class="scal-sec">Stories</div>${scalStoryTotals(stories)}<div class="scal-sgrid${scal.statsOk ? ' row' : ''}">${stories.map(s => scalStoryCard(s, cols)).join('')}</div>${scalStoryCaption()}</div>` : '';
+  const none = !busy && !err && !posts.length && !stories.length ? '<div class="scal-empty">Nothing went out at this hour.</div>' : '';
+  return `<aside class="scal-panel" role="dialog" aria-label="Posts and stories at ${mkEsc(SCAL_DOW[dow])} ${mkEsc(scalHour(h))}" style="--c:#4C8DF5;--bf:#FFFFFF">
+    <div class="scal-ph"><span class="scal-b" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+      <div class="when"><b>${SCAL_DOW[dow]} at ${scalHour(h)}</b><span>What went out at this hour, last 30 days</span></div>
+      <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
+    <div class="scal-pb">${verdict}<p class="scal-pcap">${said}</p>${none}${list}${sto}</div><div class="scal-cue" aria-hidden="true"><span>Scroll for more</span></div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
