@@ -277,11 +277,12 @@ function scalPaint() {
     ${late.length ? `<p class="scal-note">${late.map(n => `${SOC_NETS[n]} has no posts on record before ${SCAL_MONTHS_NAMED[SCAL_START[n]] || SCAL_START[n]}`).join('. ')}.</p>` : ''}
     <div class="scal-layout${scal.sel || scal.sday ? ' open' : ''}">
       <div class="scal-cal">${body}</div>
-      ${scal.sday ? (scal.sday.slot ? scalSlotPanelHtml(cols) : scalStoryPanelHtml(cols)) : scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
+      ${scal.sday ? (scal.sday.slot ? scalSlotPanelHtml(cols) : scal.sday.day ? scalDayPanelHtml(cols) : scalStoryPanelHtml(cols)) : scal.sel ? scalPanelHtml(scalFind(scal.sel), cols, posts) : ''}
     </div>
     <p class="slv-muted">Posts from Metricool, updated nightly${synced ? ', last ' + mkEsc(synced) : ''}${stale ? ' (no update recorded yet)' : ''}. The apps report a day or two late, so the last days can be thin. Instagram, Facebook and TikTok only for now; stories show when the Stories chip is on, as a picture and the time (${scal.statsOk ? 'their numbers show because you are signed in to the dashboard' : 'story numbers are private, so none are shown'}). Only the numbers anyone can see on a post are shown (likes, comments, shares, and plays on reels and videos).</p>`;
   if (scal.sel) { const c = root.querySelector('.scal-close'); if (c && scal.focusPanel) { c.focus(); scal.focusPanel = false; } }
   scalLbTell(); scalReportHeight(); scalCueInit();
+  if (scalPhoneStories() && !scal.serr && !scal.sbusy && scalPeriod().months.some(k => !scalStoryCache[k])) scalEnsureStories();
 }
 
 // A pop-up taller than the window scrolls inside itself (Kate, 23 Nov 2026). The bar is drawn in the brand colour and a soft fade with "Scroll for more" sits
@@ -311,7 +312,7 @@ function scalWeekHtml(posts, cols, per, today) {
   }
   // Phone: one block a day, no hour grid.
   const stacked = days.map(d => { const list = posts.filter(p => p.date === d);
-    return `<div class="scal-wcol${d > today ? ' future' : ''}${d === today ? ' today' : ''}"><div class="scal-wh"><b>${mkD(d).toLocaleDateString('en-GB', { weekday: 'short' })}</b><span class="n">${mkD(d).getDate()}</span></div>${scalStoryPills(d, cols)}${list.length ? list.map(p => scalTile(p, cols, 'wc')).join('') : `<div class="scal-empty">${d > today ? 'Not yet' : 'No posts'}</div>`}</div>`; }).join('');
+    return `<div class="scal-wcol${d > today ? ' future' : ''}${d === today ? ' today' : ''}"><div class="scal-wh"><b>${mkD(d).toLocaleDateString('en-GB', { weekday: 'short' })}</b><span class="n">${mkD(d).getDate()}</span></div>${scalPhoneStories() ? '' : scalStoryPills(d, cols)}${scalBars(d, list, cols, true) || `<div class="scal-empty">${d > today ? 'Not yet' : 'No posts'}</div>`}</div>`; }).join('');
   const legend = best ? '<p class="scal-legend"><span>Blue behind the hours:</span><i class="a"></i><i class="b"></i><i class="c"></i><span>darker is a better time to post, from Metricool, last 30 days.</span></p>' : '';
   return `${legend}<div class="scal-tgrid">${g}</div><div class="scal-wstack">${stacked}</div>`;
 }
@@ -351,8 +352,9 @@ function scalMonthHtml(posts, cols, per, today) {
     const list = inM ? (by[iso] || []) : [], max = solo ? 4 : 3, open = scal.open === iso, shown = open ? list : list.slice(0, max);
     cells += `<div class="scal-cell${inM ? '' : ' out'}${inM && iso > today ? ' future' : ''}${iso === today ? ' today' : ''}${iso && scal.day === iso ? ' sel' : ''}" ${iso ? `data-day="${iso}" onclick="scalDay('${iso}')"` : ''}>
       <div class="scal-dn">${inM ? day : ''}</div>
+      ${scalBars(iso, list, cols, false)}
       ${solo ? `<div class="scal-tiles">${shown.map(pill).join('')}</div>` : shown.map(pill).join('')}
-      ${iso ? scalStoryPills(iso, cols) : ''}
+      ${iso && !scalPhoneStories() ? scalStoryPills(iso, cols) : ''}
       ${!open && list.length > max ? `<button type="button" class="scal-more" onclick="event.stopPropagation();scalMore('${iso}')">+${list.length - max} more</button>` : ''}
       <div class="scal-dots">${list.map(p => `<span class="dot" style="--c:${cols[p.net]}"></span>`).join('')}</div></div>`;
   }
@@ -516,18 +518,59 @@ async function scalLoadStories(key) {
   scalStoryCache[key] = (data || []).map(s => ({ net: s.network, date: String(s.post_date).slice(0, 10), at: s.posted_at, t: scalTimeParts(s.posted_at), img: s.image_url || '' }));
 }
 async function scalEnsureStories() {
-  if (!scal.stories) return;
+  if (!scalStoriesShown()) return;
   const need = scalPeriod().months.filter(k => !scalStoryCache[k]);
   if (!need.length) { scalAskStats(); return; }
   if (!need.length) return;
+  scal.sbusy = true;
   try { await Promise.all(need.map(scalLoadStories)); scal.serr = false; } catch (e) { console.error(e); scal.serr = true; }
+  scal.sbusy = false;
   scalAskStats();
   scalPaint();
 }
 // The posts first (as before), then the stories when the chip is on.
 async function scalEnsure() { await scalEnsurePosts(); await scalEnsureStories(); scalAskPostStats(); }
 
-const scalStoriesOf = (date, net) => scal.stories ? (scalStoryCache[date.slice(0, 7)] || []).filter(s => s.date === date && scal.on[s.net] && (!net || s.net === net) && (scal.src === 'all' || scal.src === 'manual')) : [];
+// ── Phone (Kate, 23 Nov 2026: "gayahin mo na lang yung format ng google calendar, para hindi masikip") ──
+// On a phone the month and the week show slim bars a day instead of every post: with more than one platform on, one bar per platform (icon and count, stacked like a sandwich);
+// with one platform on, two bars, Posts and Stories. A tap on a bar opens a window: a post straight away when there is only one, otherwise the list of that day.
+// Stories come with the one-platform phone view without turning the Stories chip on (TikTok has none).
+const SCAL_PHONE_MQ = '(max-width:720px),(pointer:coarse) and (max-width:1100px)';
+const scalIsPhone = () => window.matchMedia(SCAL_PHONE_MQ).matches;
+const scalOnNets = () => SCAL_NETS.filter(n => scal.on[n]);
+const scalPhoneStories = () => scalIsPhone() && scalOnNets().length === 1 && scalOnNets()[0] !== 'tiktok';
+const scalStoriesShown = () => scal.stories || scalPhoneStories();
+try { window.matchMedia(SCAL_PHONE_MQ).addEventListener('change', () => { if (document.getElementById('scalRoot')) scalEnsure(); }); } catch (e) {}
+function scalBars(iso, list, cols, wide) {
+  if (!iso) return '';
+  const nets = scalOnNets(), multi = nets.length > 1, out = [];
+  const chip = (n, what, k, label) => {
+    const st = what === 'stories', c = st ? '#B7791F' : cols[n], fg = st ? '#FFFFFF' : scalBadgeFg(cols[n]);
+    return `<button type="button" class="scal-bar${st ? ' st' : ''}${multi ? '' : ' two'}" style="--c:${c};--bf:${fg}" onclick="event.stopPropagation();scalBarOpen('${iso}','${n}','${what}')" aria-label="${mkEsc(SOC_NETS[n] + ' ' + what + ' on ' + scalLong(iso) + ', ' + k)}">${multi ? `<span class="ic" aria-hidden="true">${scalIco(n)}</span>` : ''}<span class="t">${mkEsc(label)}</span><b>${k}</b></button>`;
+  };
+  if (multi) nets.forEach(n => { const k = list.filter(p => p.net === n).length; if (k) out.push(chip(n, 'posts', k, wide ? SOC_NETS[n] : '')); });
+  else {
+    const n = nets[0], k = list.filter(p => p.net === n).length, ks = n === 'tiktok' ? 0 : scalStoriesOf(iso, n).length;
+    if (k) out.push(chip(n, 'posts', k, 'Posts'));
+    if (ks) out.push(chip(n, 'stories', ks, 'Stories'));
+  }
+  return out.length ? `<div class="scal-bars${wide ? ' wide' : ''}">${out.join('')}</div>` : '';
+}
+function scalBarOpen(date, net, what) {
+  if (what === 'stories') { scalStoryOpen(date, net); return; }
+  const list = scalPosts(scalPeriod()).filter(p => p.date === date && p.net === net).sort(scalByAt);
+  if (list.length === 1) { scalOpen(list[0].id); return; }
+  scal.sel = null; scal.sday = { day: true, date, net }; scal.focusPanel = true; scalPaint();
+}
+function scalDayPanelHtml(cols) {
+  const { date, net } = scal.sday, list = scalPosts(scalPeriod()).filter(p => p.date === date && p.net === net).sort(scalByAt);
+  return `<aside class="scal-panel" role="dialog" aria-label="${mkEsc(SOC_NETS[net])} posts on ${mkEsc(scalLong(date))}" style="--c:${cols[net]};--bf:${scalBadgeFg(cols[net])}">
+    <div class="scal-ph"><span class="scal-b" aria-hidden="true">${scalIco(net)}</span>
+      <div class="when"><b>${scalLong(date)}</b><span>${SOC_NETS[net]}, ${list.length} post${list.length === 1 ? '' : 's'}</span></div>
+      <button type="button" class="scal-icon scal-close" aria-label="Close" onclick="scalClose()">×</button></div>
+    <div class="scal-pb">${list.length ? `<div class="scal-slotlist">${list.map(p => scalTile(p, cols, 'wc')).join('')}</div>` : '<div class="scal-empty">No posts this day.</div>'}</div><div class="scal-cue" aria-hidden="true"><span>Scroll for more</span></div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
+}
+const scalStoriesOf = (date, net) => scalStoriesShown() ? (scalStoryCache[date.slice(0, 7)] || []).filter(s => s.date === date && scal.on[s.net] && (!net || s.net === net) && (scal.src === 'all' || scal.src === 'manual')) : [];
 function scalStoriesChip(cols) {
   return `<button type="button" class="scal-plat" style="--c:#B7791F;--bf:#FFFFFF" aria-pressed="${!!scal.stories}" onclick="scalToggleStories()" title="Stories: a picture and the time, no numbers"><span class="scal-b" aria-hidden="true">ST</span>Stories</button>`;
 }
@@ -566,7 +609,7 @@ function scalStoryNote(per) {
 const SCAL_SFIELDS = [['views', 'Views'], ['reach', 'Reach'], ['replies', 'Replies'], ['reactions', 'Reactions'], ['taps_forward', 'Taps forward'], ['taps_back', 'Taps back'], ['exits', 'Exits']];
 const scalStatOf = s => scal.sstats[s.net + '|' + s.at] || null;
 function scalAskStats() {
-  if (!calEmbedded || !scal.stories || !scal.ws) return;
+  if (!calEmbedded || !scalStoriesShown() || !scal.ws) return;
   const per = scalPeriod(), key = per.from + '|' + per.to;
   if (scal.sasked[key]) return;
   scal.sasked[key] = true;
