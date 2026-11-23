@@ -209,6 +209,28 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow-y:auto;position:fixed;z-index:900;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 24px));max-height:90vh;box-shadow:0 24px 70px rgba(0,0,0,.45)}
 .scal-panel[aria-label="Stories"]{width:min(780px,calc(100vw - 24px))}
 .scal-panel .scal-ph{position:sticky;top:0;background:var(--surface);z-index:1}
+/* Platform badges show the app's own mark, drawn in the badge's text colour (Kate, 23 Nov 2026) */
+.scal-b svg,.scal-bb svg{display:block;width:62%;height:62%}
+.scal-schip .scal-bb svg{width:72%;height:72%}
+/* The pop-up's scroll bar (Kate, 23 Nov 2026). The frame hides every scroll bar when embedded, which left no sign that a pop-up had more below. This one is drawn on
+   purpose: a brand-colour pill (mint on the dark theme, green on the light) on a faint track that starts under the sticky header. Below it, a fade and "Scroll for more"
+   show while there is more to read and go at the end (data-more, set in calendar.js). */
+.scal-panel,.scal-impbox{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--good) 80%,transparent) color-mix(in srgb,var(--text) 8%,transparent)}
+@supports selector(::-webkit-scrollbar){
+  .scal-panel,.scal-impbox{scrollbar-width:auto;scrollbar-color:auto}
+  .scal-panel::-webkit-scrollbar,.scal-impbox::-webkit-scrollbar{display:block;width:14px}
+  .scal-panel::-webkit-scrollbar-track,.scal-impbox::-webkit-scrollbar-track{background:color-mix(in srgb,var(--text) 7%,transparent);background-clip:padding-box;border:4px solid transparent;border-radius:999px;margin:78px 0 14px}
+  .scal-impbox::-webkit-scrollbar-track{margin:14px 0}
+  .scal-panel::-webkit-scrollbar-thumb,.scal-impbox::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--good) 85%,transparent);background-clip:padding-box;border:4px solid transparent;border-radius:999px;min-height:48px}
+  .scal-panel::-webkit-scrollbar-thumb:hover,.scal-panel::-webkit-scrollbar-thumb:active,.scal-impbox::-webkit-scrollbar-thumb:hover{background:var(--good);background-clip:padding-box}
+  .scal-panel::-webkit-scrollbar-button,.scal-impbox::-webkit-scrollbar-button{display:none;width:0;height:0}
+}
+.scal-cue{position:sticky;bottom:0;height:0;pointer-events:none;z-index:2}
+.scal-cue span{position:absolute;left:0;right:0;bottom:0;height:76px;display:flex;align-items:flex-end;justify-content:center;gap:8px;padding-bottom:12px;background:linear-gradient(to top,var(--surface) 32%,transparent);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.scal-cue span::after{content:"";width:8px;height:8px;margin-bottom:5px;border-right:2px solid var(--good);border-bottom:2px solid var(--good);transform:rotate(45deg)}
+.scal-panel:not([data-more="1"]) .scal-cue{display:none}
+@media(prefers-reduced-motion:no-preference){.scal-cue span::after{animation:scalCueNudge 1.6s ease-in-out infinite}}
+@keyframes scalCueNudge{0%,100%{transform:translateY(0) rotate(45deg)}50%{transform:translateY(3px) rotate(45deg)}}
 .scal-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:890}
 .scal-ph{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
 .scal-ph .scal-b{flex:none;width:32px;height:32px;border-radius:9px;background:var(--c);color:var(--bf);font-weight:700;font-size:12px;display:grid;place-items:center}
