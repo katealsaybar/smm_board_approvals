@@ -408,7 +408,7 @@ function scalPanelHtml(p, cols, posts) {
       <div class="scal-pic" ${p.img ? '' : 'style="min-height:160px"'}>${scalImg(p, true)}${(scalIsVideo(p) || scalEmbedUrl(p)) ? `<button type="button" class="scal-vid" data-id="${mkEsc(p.id)}" onclick="scalPlay(this.dataset.id)" aria-label="${scalIsVideo(p) ? 'Play' : 'Show'} this ${SCAL_KIND[p.kind]} here">${SCAL_PLAY}</button>` : ''}</div>
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <div><div class="scal-sec">Caption</div><p class="scal-pcap full">${scalCap(p)}</p></div>
-      <div><div class="scal-sec">How it did</div><div class="scal-nums">${nums.map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`).join('')}</div></div>
+      <div class="scal-stot"><span>How it did</span><dl class="scal-sstats">${nums.map(([l, v]) => `<div><dt>${l}</dt><dd>${scalFmt(v)}</dd></div>`).join('')}</dl></div>
       ${scalPrivateNums(p)}
       ${scalTryHtml(p)}
     </div><div class="scal-cue" aria-hidden="true"><span>Scroll for more</span></div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
@@ -594,10 +594,10 @@ function scalPrivateNums(p) {
   const st = scal.pstats[p.net + '|' + p.at]; if (!st) return '';
   const items = [[p.viewLabel === 'Impressions' ? 'Impressions' : (scalIsVideo(p) ? 'Plays' : 'Views'), st.views], ['Reach', st.reach], ['Saves', st.saves], [p.repostLabel, st.shares], ['Interactions', st.interactions]]
     .filter(([, v]) => v !== null && v !== undefined)
-    .map(([l, v]) => `<div class="scal-num"><div class="v">${scalFmt(v)}</div><div class="l">${l}</div></div>`);
-  if (st.avgWatch !== null && st.avgWatch !== undefined) items.push(`<div class="scal-num"><div class="v">${Math.round(st.avgWatch * 10) / 10}s</div><div class="l">Average watch time</div></div>`);
-  if (st.skip !== null && st.skip !== undefined) items.push(`<div class="scal-num"><div class="v">${Math.round(st.skip)}%</div><div class="l">Skipped early</div></div>`);
-  return items.length ? `<div><div class="scal-sec">Private numbers <span class="scal-priv">only you can see these, signed in</span></div><div class="scal-nums">${items.join('')}</div></div>` : '';
+    .map(([l, v]) => `<div><dt>${l}</dt><dd>${scalFmt(v)}</dd></div>`);
+  if (st.avgWatch !== null && st.avgWatch !== undefined) items.push(`<div><dt>Average watch time</dt><dd>${Math.round(st.avgWatch * 10) / 10}s</dd></div>`);
+  if (st.skip !== null && st.skip !== undefined) items.push(`<div><dt>Skipped early</dt><dd>${Math.round(st.skip)}%</dd></div>`);
+  return items.length ? `<div class="scal-stot"><span>Private numbers <em class="scal-priv">only you can see these, signed in</em></span><dl class="scal-sstats">${items.join('')}</dl></div>` : '';
 }
 function scalGotStats(d) {
   if (!d || !Array.isArray(d.rows) || d.rows.length > 5000) return;

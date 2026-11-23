@@ -470,6 +470,7 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-srcbar .sc-seg button{min-height:34px;font-size:13.5px;padding:0 14px}
 
 /* Private post numbers in the pop-up (Kate, 13 Nov 2026) */
+.scal-stot .scal-priv{font-style:normal}
 .scal-priv{margin-left:8px;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted2)}
 
 /* Filters: one button and a panel (Kate, 13 Nov 2026, option A) */
