@@ -776,6 +776,13 @@ function scalReportHeight() {
   }, 40);
 }
 if (calEmbedded && window.ResizeObserver) { const w = document.querySelector('.wrap'); if (w) new ResizeObserver(scalReportHeight).observe(w); }
+// Kate, 23 Nov 2026: while a pop-up is open the dashboard stretches this frame to the height of the window (trs-cal-lb), so the page here is taller than the frame and its own scroll starts at the top: the
+// calendar behind the pop-up jumped up, and back down when it closed. Once the frame is stretched the dashboard says how far down the calendar was showing (trs-cal-scroll) and the page scrolls there.
+window.addEventListener('message', e => {
+  if (!calEmbedded || e.source !== window.parent || !e.data || e.data.type !== 'trs-cal-scroll') return;
+  const y = Number(e.data.y); if (!isFinite(y) || y < 0) return;
+  window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y)); setTimeout(() => window.scrollTo(0, y), 60);
+});
 function scalLbStart(items, i) { scalLbStop(); scalLb = { items, i, el: 0, dur: 5000, paused: false, timer: null }; scalLbTell(true); scalLbPaint(); }
 function scalLbStop() { if (scalLb && scalLb.timer) clearInterval(scalLb.timer); }
 function scalLbClose() { scalLbStop(); scalLb = null; const r = document.getElementById('scalLb'); if (r) r.remove(); scalLbTell(false); }
