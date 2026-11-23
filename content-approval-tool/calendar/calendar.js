@@ -409,6 +409,7 @@ function scalPanelHtml(p, cols, posts) {
       ${calSafeUrl(p.url) ? `<a class="sc-btn scal-open" href="${mkEsc(calSafeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${scalIsVideo(p) ? 'Watch' : 'Open'} on ${verb}</a>` : ''}
       <div><div class="scal-sec">Caption</div><p class="scal-pcap full">${scalCap(p)}</p></div>
       <div class="scal-stot"><span>How it did</span><dl class="scal-sstats">${nums.map(([l, v]) => `<div><dt>${l}</dt><dd>${scalFmt(v)}</dd></div>`).join('')}</dl></div>
+      ${scalGraphHtml(p)}
       ${scalPrivateNums(p)}
       ${scalTryHtml(p)}
     </div><div class="scal-cue" aria-hidden="true"><span>Scroll for more</span></div></aside><div class="scal-scrim" onclick="scalScrimClick(event)"></div>`;
@@ -589,6 +590,66 @@ function scalGotPostStats(d) {
   });
   scalPaint();
 }
+// What the views led to (Kate, 23 Nov 2026, from the story graph mockup): the same look as the story viewer's "What the viewers did". One list of numbers feeds the lead line,
+// the bar, the rows and the answer cards, so the sentences cannot disagree with the figures. The whole is the post's views (plays, or impressions on a Facebook post); the parts
+// are the reactions the app counted, and the rest is "No reaction counted". Saves come only from the private numbers. A part that is 0 is not drawn and is named in the foot.
+function scalGraphHtml(p) {
+  const total = p.views; if (total === null || total === undefined || !(total > 0)) return '';
+  const st = scal.pstats[p.net + '|' + p.at] || {};
+  const unit = p.viewLabel === 'Impressions' ? 'impressions' : (scalIsVideo(p) ? 'plays' : 'views');
+  const rep = p.net === 'instagram';
+  const defs = [
+    { k: 'like', c: 'var(--gr-like)', name: 'Liked', plural: 'Likes', sub: 'pressed like', n: p.likes, says: 'They pressed like.' },
+    { k: 'com', c: 'var(--gr-com)', name: 'Commented', plural: 'Comments', sub: 'left a comment', n: p.comments, says: 'They left a comment.' },
+    { k: 'shr', c: 'var(--gr-shr)', name: rep ? 'Reposted' : 'Shared', plural: p.repostLabel, sub: rep ? 'reposted it to their own page' : 'sent it on to someone', n: p.reposts, says: rep ? 'They reposted it to their own page.' : 'They sent it on to someone.' },
+    { k: 'sav', c: 'var(--gr-sav)', name: 'Saved', plural: 'Saves', sub: 'kept it for later', n: st.saves, says: 'They kept it to come back to.' }
+  ].filter(d => d.n !== null && d.n !== undefined);
+  const sum = defs.reduce((a, d) => a + d.n, 0);
+  if (!sum || sum > total) return '';
+  const pct = n => n > 0 && n * 100 / total < 0.5 ? 0 : Math.round(n * 100 / total);
+  const pctTxt = n => n > 0 && n * 100 / total < 0.5 ? '<1%' : pct(n) + '%';
+  const parts = defs.filter(d => d.n > 0).concat([{ k: 'non', c: 'var(--gr-non)', name: 'No reaction counted', sub: 'watched and moved on', n: total - sum, says: 'No like, comment, share or save was counted for these.' }]).filter(d => d.n > 0);
+  const zero = defs.filter(d => d.n === 0).map(d => d.plural);
+  const sayOf = d => `<b>${mkEsc(d.name)}</b>${scalFmt(d.n)} of ${scalFmt(total)} ${unit}, ${pct(d.n) ? pct(d.n) + ' in every 100' : 'fewer than 1 in every 100'}. ${mkEsc(d.says)}`;
+  const reacted = pct(sum);
+  const lead = `<b>${reacted ? reacted + ' in every 100' : 'Fewer than 1 in every 100'}</b> ${unit} ended in a reaction: a like, a comment, a share${st.saves !== null && st.saves !== undefined ? ' or a save' : ''}.`;
+  const head = `What the ${scalFmt(total)} ${unit} led to`;
+  return `<section class="scal-gr" aria-label="${mkEsc(head)}">
+    <div class="scal-grh">${mkEsc(head)}</div>
+    <p class="scal-grlead">${lead}</p>
+    <div class="scal-gstack" role="img" aria-label="${mkEsc(head)}">${parts.map(d => `<span class="scal-gseg" data-k="${d.k}" style="--n:${d.n};--c:${d.c}"></span>`).join('')}</div>
+    <div class="scal-gans" role="status" aria-live="polite">Hover or tap a part of the bar.</div>
+    <ul class="scal-glegend">${parts.map(d => `<li class="scal-grrow" data-k="${d.k}" tabindex="0" style="--c:${d.c}" data-say="${mkEsc(sayOf(d))}"><span class="dot"></span><span class="nm">${mkEsc(d.name)}<small>${mkEsc(d.sub)}</small></span><span class="n">${scalFmt(d.n)}</span><span class="pc">${pctTxt(d.n)}</span></li>`).join('')}</ul>
+    <p class="scal-grfoot">Out of ${scalFmt(total)} ${unit}. Someone who liked and shared is counted in both.${zero.length ? ` ${zero.join(' and ')} are 0, so they are not shown as a bar.` : ''}</p>
+  </section>`;
+}
+// Hover, focus or tap a part of the bar or a row and both light up; on a computer the answer fills the card under the bar, on a phone it opens inside the tapped row.
+const scalGrTouch = () => matchMedia('(hover:none)').matches || innerWidth <= 720;
+function scalGrHide(sec) {
+  sec.querySelectorAll('.lit').forEach(e => e.classList.remove('lit'));
+  sec.querySelectorAll('.scal-hovc').forEach(x => x.remove());
+  const a = sec.querySelector('.scal-gans'); if (a) { a.classList.remove('on'); a.textContent = 'Hover or tap a part of the bar.'; }
+}
+function scalGrShow(el) {
+  const sec = el.closest('.scal-gr'), k = el.dataset.k, row = sec.querySelector('.scal-grrow[data-k="' + k + '"]'); if (!row) return;
+  sec.querySelectorAll('.lit').forEach(e => e.classList.remove('lit'));
+  sec.querySelectorAll('[data-k="' + k + '"]').forEach(e => e.classList.add('lit'));
+  const c = row.style.getPropertyValue('--c');
+  if (scalGrTouch()) {
+    sec.querySelectorAll('.scal-hovc').forEach(x => x.remove());
+    const d = document.createElement('div'); d.className = 'scal-hovc'; d.style.setProperty('--c', c); d.innerHTML = row.dataset.say; row.appendChild(d);
+    clearTimeout(sec._t); sec._t = setTimeout(() => scalGrHide(sec), 5000);
+  } else {
+    const a = sec.querySelector('.scal-gans'); a.style.setProperty('--c', c); a.innerHTML = row.dataset.say; a.classList.add('on');
+  }
+}
+const scalGrPart = e => e.target && e.target.closest ? e.target.closest('.scal-gr [data-k]') : null;
+document.addEventListener('mouseover', e => { const t = scalGrPart(e); if (t && !scalGrTouch()) scalGrShow(t); });
+document.addEventListener('mouseout', e => { const t = scalGrPart(e); if (t && !scalGrTouch() && !(e.relatedTarget && t.contains(e.relatedTarget))) scalGrHide(t.closest('.scal-gr')); });
+document.addEventListener('focusin', e => { const t = scalGrPart(e); if (t && t.classList.contains('scal-grrow')) scalGrShow(t); });
+document.addEventListener('focusout', e => { const t = scalGrPart(e); if (t && t.classList.contains('scal-grrow')) scalGrHide(t.closest('.scal-gr')); });
+document.addEventListener('click', e => { const t = scalGrPart(e); if (t && scalGrTouch()) scalGrShow(t); });
+
 // The private block of the pop-up, only when the dashboard sent the numbers. Facebook's views are impressions.
 function scalPrivateNums(p) {
   const st = scal.pstats[p.net + '|' + p.at]; if (!st) return '';

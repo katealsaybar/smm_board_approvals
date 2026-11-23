@@ -471,6 +471,38 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 
 /* Private post numbers in the pop-up (Kate, 13 Nov 2026) */
 .scal-stot .scal-priv{font-style:normal}
+/* What the views led to (Kate, 23 Nov 2026), the look of the story viewer's graph: a thin bar, an answer card under it, a row a part with its swatch, name, count and share. */
+.scal-gr{--gr-like:#C2559F;--gr-com:#D9643B;--gr-shr:#3F6FCF;--gr-sav:#3E7A5E;--gr-non:#9A9AA5}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .scal-gr{--gr-like:#E58AD0;--gr-com:#FF9D7A;--gr-shr:#8FB8FF;--gr-sav:#99F6E4;--gr-non:#6B6B78}}
+:root[data-theme="dark"] .scal-gr{--gr-like:#E58AD0;--gr-com:#FF9D7A;--gr-shr:#8FB8FF;--gr-sav:#99F6E4;--gr-non:#6B6B78}
+.scal-grh{font-size:15px;font-weight:600;margin:0 0 4px}
+.scal-grlead{margin:0 0 10px;color:var(--muted);font-size:13px}
+.scal-grlead b{color:var(--text);font-weight:600}
+.scal-gstack{display:flex;height:10px;gap:3px;margin:6px 0 12px}
+.scal-gseg{flex:var(--n);min-width:5px;border-radius:999px;background:var(--c);position:relative;cursor:default;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease}
+.scal-gseg::after{content:"";position:absolute;inset:-9px 0}
+.scal-gans{min-height:64px;margin:0 0 8px;padding:10px 14px;border:1px solid var(--border);border-radius:16px;font-size:13px;line-height:1.4;color:var(--muted);display:flex;flex-direction:column;justify-content:center;transition:border-color .15s,box-shadow .15s,color .15s}
+.scal-gans.on{color:var(--text);border-color:var(--c);box-shadow:0 0 18px -6px var(--c)}
+.scal-gans b,.scal-hovc b{display:block;font-size:14px;margin-bottom:2px;color:var(--text)}
+.scal-glegend{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.scal-grrow{display:grid;grid-template-columns:12px 1fr auto auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid transparent;border-radius:12px;cursor:default;position:relative;outline:none;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.scal-grrow .dot{width:12px;height:12px;border-radius:4px;background:var(--c)}
+.scal-grrow .nm{color:var(--text)}
+.scal-grrow .nm small{display:block;color:var(--muted);font-size:13px}
+.scal-grrow .n{font-weight:700;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.scal-grrow .pc{color:var(--muted);min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.scal-grfoot{margin:10px 0 0;color:var(--muted);font-size:13px}
+.scal-grrow.lit{transform:translateY(-3px);border-color:var(--c);background:color-mix(in srgb,var(--text) 5%,transparent);box-shadow:0 0 0 1px var(--c),0 8px 22px -6px var(--c)}
+.scal-gseg.lit{transform:translateY(-2px);filter:brightness(1.18);box-shadow:0 0 0 1px var(--c),0 0 14px var(--c)}
+.scal-grrow:focus-visible{border-color:var(--c)}
+.scal-hovc{grid-column:1/-1;margin-top:6px;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.4;background:var(--surface2);border:1px solid var(--c);box-shadow:0 0 18px -6px var(--c);color:var(--text)}
+@media(max-width:720px){
+  .scal-grrow{grid-template-columns:12px 1fr auto;min-height:44px}
+  .scal-grrow .pc{display:none}
+  .scal-grrow.lit{transform:none}
+  .scal-gans{display:none}
+}
+@media(prefers-reduced-motion:reduce){.scal-grrow.lit,.scal-gseg.lit{transform:none}.scal-grrow,.scal-gseg{transition:none}}
 .scal-priv{margin-left:8px;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted2)}
 
 /* Filters: one button and a panel (Kate, 13 Nov 2026, option A) */
