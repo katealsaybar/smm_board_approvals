@@ -509,3 +509,29 @@ button.scal-vid:hover{transform:translate(-50%,-50%) scale(1.08)}
 .scal-lbdl:active:not(:disabled){transform:translateY(0)}
 .scal-lbdl:focus-visible{outline:2px solid #fff;outline-offset:3px}
 .scal-lbdl:disabled{opacity:.75;cursor:progress}
+
+/* What the viewers of a story did (Kate, 23 Nov 2026). A thin bar and four rows in the viewer's side panel, between the numbers and Download. Every part lifts and glows on hover, tap or
+   focus and the answer shows in the reserved slot under the bar, so nothing is covered. Colours are the viewer's own dark palette, solid. */
+.scal-lbg{display:flex;flex-direction:column;gap:6px;margin-top:4px;--g:#e58ad0}
+.scal-lbg h4{margin:0;font-family:inherit;font-size:14px;font-weight:700;line-height:1.3;color:#fff}
+.scal-lbg-lead{margin:0;font-size:13px;line-height:1.4;color:rgba(255,255,255,.7)}
+.scal-lbg-lead b{color:#fff;font-weight:600}
+.scal-lbg-bar{display:flex;gap:3px;height:10px;margin:8px 0 2px}
+.scal-lbg-seg{flex:var(--n) 1 0;min-width:4px;border-radius:999px;background:var(--g);position:relative;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease}
+.scal-lbg-seg::after{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px}
+.scal-lbg-ans{min-height:84px;box-sizing:border-box;padding:9px 12px;border:1px solid rgba(255,255,255,.14);border-radius:14px;font-size:13px;line-height:1.4;color:rgba(255,255,255,.65);display:flex;flex-direction:column;justify-content:center;transition:border-color .15s ease,box-shadow .15s ease,color .15s ease}
+.scal-lbg-ans.on{color:#fff;border-color:var(--g);box-shadow:0 0 18px -6px var(--g)}
+.scal-lbg-ans b{display:block;font-size:14px;margin-bottom:2px}
+.scal-lbg-rows{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:2px}
+.scal-lbg-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;min-height:34px;padding:4px 8px;border:1px solid transparent;border-radius:10px;font-size:13px;cursor:default;outline:none;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.scal-lbg-row i{width:12px;height:12px;border-radius:4px;background:var(--g)}
+.scal-lbg-row b{min-width:28px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.scal-lbg-row em{min-width:38px;text-align:right;font-style:normal;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
+.scal-lbg-row.lit{border-color:var(--g);background:rgba(255,255,255,.04);box-shadow:0 0 0 1px var(--g),0 8px 22px -8px var(--g)}
+.scal-lbg-seg.lit{filter:brightness(1.18);box-shadow:0 0 0 1px var(--g),0 0 14px var(--g)}
+.scal-lbg-foot{margin:2px 0 0;font-size:13px;color:rgba(255,255,255,.65);line-height:1.4}
+@media(hover:hover){.scal-lbg-row.lit{transform:translateY(-3px)}.scal-lbg-seg.lit{transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.scal-lbg *{transition:none!important;transform:none!important}}
+@media(max-width:759px){.scal-lbg-row{min-height:44px}.scal-lbg-ans{min-height:76px}}
+/* A phone keeps the numbers under the picture, so a story with the graph gets a taller footer; the footer scrolls for the rest. */
+@media(max-width:759px){.scal-lbframe.story.hasg{--ft:210px}}

@@ -616,6 +616,50 @@ function scalStatLines(st) {
   const items = SCAL_SFIELDS.filter(([k]) => st[k] !== null && st[k] !== undefined).map(([k, l]) => `<div><dt>${l}</dt><dd>${scalFmt(st[k])}</dd></div>`).join('');
   return items ? `<dl class="scal-sstats">${items}</dl>` : '';
 }
+// What the viewers of a story did (Kate, 23 Nov 2026): one thin bar split into tapped forward, left the stories, tapped back and other, out of the views. Every part of the bar and
+// every row lifts and glows on hover, tap or focus, and the answer is written in a reserved slot under the bar, so it never covers a row. The sentences are built from the same numbers
+// as the bar. It only draws when views and all three tap numbers came from the dashboard.
+function scalFlowHtml(st) {
+  if (!st) return '';
+  const v = st.views, f = st.taps_forward, b = st.taps_back, x = st.exits;
+  if ([v, f, b, x].some(n => n === null || n === undefined) || !(v > 0)) return '';
+  const sum = f + b + x, over = sum > v, D = over ? sum : v, oth = over ? 0 : v - sum;
+  const pct = n => Math.round(n * 100 / D);
+  const parts = [
+    { k: 'fwd', c: '#e58ad0', name: 'Tapped forward', n: f, says: 'They moved on to the next story.' },
+    { k: 'exit', c: '#ff9d7a', name: 'Left the stories', n: x, says: 'They closed it or swiped to another account.' },
+    { k: 'back', c: '#8fb8ff', name: 'Tapped back', n: b, says: 'They went back to watch the one before.' },
+    { k: 'oth', c: '#8a8a98', name: 'Other', n: oth, says: 'No tap was counted for these.' }
+  ].filter(p => p.k !== 'oth' || p.n > 0);
+  const of = over ? 'taps and exits' : 'views';
+  const say = p => p.n + ' of ' + D + ' ' + of + ', ' + pct(p.n) + ' in every 100. ' + p.says;
+  const seg = parts.filter(p => p.n > 0).map(p => `<span class="scal-lbg-seg" data-k="${p.k}" data-nm="${p.name}" data-say="${mkEsc(say(p))}" style="--n:${p.n};--g:${p.c}"></span>`).join('');
+  const rows = parts.map(p => `<li class="scal-lbg-row" data-k="${p.k}" data-nm="${p.name}" data-say="${mkEsc(say(p))}" tabindex="0" style="--g:${p.c}"><i aria-hidden="true"></i><span>${p.name}</span><b>${scalFmt(p.n)}</b><em>${pct(p.n)}%</em></li>`).join('');
+  return `<div class="scal-lbg" aria-label="What the ${scalFmt(D)} viewers did"><h4>What the ${scalFmt(D)} viewers did</h4>
+    <p class="scal-lbg-lead"><b>${pct(f)} in every 100</b> tapped forward. <b>${pct(x)} in every 100</b> left.</p>
+    <div class="scal-lbg-bar" role="img" aria-label="Tapped forward ${f}, left ${x}, tapped back ${b}${oth ? ', other ' + oth : ''}">${seg}</div>
+    <div class="scal-lbg-ans" aria-live="polite">Hover or tap a part of the bar.</div><ul class="scal-lbg-rows">${rows}</ul>
+    ${over ? '<p class="scal-lbg-foot">Some people tapped more than once, so this is out of all taps and exits.</p>' : ''}</div>`;
+}
+function scalFlowOn(el) {
+  const g = el.closest('.scal-lbg'); if (!g) return;
+  const k = el.dataset.k, ans = g.querySelector('.scal-lbg-ans');
+  g.querySelectorAll('[data-k]').forEach(e => e.classList.toggle('lit', e.dataset.k === k));
+  g.style.setProperty('--g', el.style.getPropertyValue('--g'));
+  ans.classList.add('on'); ans.textContent = '';
+  const b = document.createElement('b'); b.textContent = el.dataset.nm; ans.appendChild(b); ans.appendChild(document.createTextNode(el.dataset.say));
+}
+function scalFlowOff(g) {
+  if (!g) return;
+  g.querySelectorAll('.lit').forEach(e => e.classList.remove('lit'));
+  const ans = g.querySelector('.scal-lbg-ans'); ans.classList.remove('on'); ans.textContent = 'Hover or tap a part of the bar.';
+}
+['mouseover', 'focusin', 'click'].forEach(ev => document.addEventListener(ev, e => { const el = e.target.closest && e.target.closest('.scal-lbg [data-k]'); if (el) scalFlowOn(el); }));
+['mouseout', 'focusout'].forEach(ev => document.addEventListener(ev, e => {
+  const el = e.target.closest && e.target.closest('.scal-lbg [data-k]'); if (!el) return;
+  const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.scal-lbg [data-k]') : null;
+  if (!to) scalFlowOff(el.closest('.scal-lbg'));
+}));
 function scalStoryCard(s, cols) {
   const st = scalStatOf(s), c = cols[s.net], cur = scal.sday && scal.sday.at && scal.sday.at === s.at && scal.sday.net === s.net;
   return `<figure class="scal-story${cur ? ' cur' : ''}" data-s="${mkEsc(s.net + '|' + s.at)}" style="--c:${c};--bf:${scalBadgeFg(c)}" onclick="scalLbOpenStory(this.dataset.s)"><div class="scal-sth"><button type="button" class="scal-splay" aria-label="Watch this story" onclick="event.stopPropagation();scalLbOpenStory(this.closest('[data-s]').dataset.s)">${SCAL_PLAY}</button>${s.img ? `<img src="${mkEsc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
@@ -874,12 +918,13 @@ function scalLbPaint() {
     const media = st && st.media && st.isVideo ? `<video src="${mkEsc(st.media)}" autoplay playsinline controls controlsList="nodownload" referrerpolicy="no-referrer"></video>`
       : (st && st.media ? `<img src="${mkEsc(st.media)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : (s.img ? `<img src="${mkEsc(s.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''));
     L.video = !!(st && st.media && st.isVideo);
-    inner = `<div class="scal-lbframe story" style="--c:${c};--bf:${scalBadgeFg(c)}">
+    const flow = scalFlowHtml(st);
+    inner = `<div class="scal-lbframe story${flow ? ' hasg' : ''}" style="--c:${c};--bf:${scalBadgeFg(c)}">
       <div class="scal-lbbars">${L.items.map((_, j) => `<i class="${j < L.i ? 'done' : j === L.i ? 'cur' : ''}"><b></b></i>`).join('')}</div>
       <div class="scal-lbhd"><span class="scal-bb" aria-hidden="true">${scalIco(s.net)}</span><b>tararosesalon</b><span>${mkEsc(when)}</span></div>
       <div class="scal-lbmedia">${media}</div>
       <button type="button" class="scal-lbtap l" aria-label="Previous" onclick="scalLbGo(-1)"></button><button type="button" class="scal-lbtap r" aria-label="Next" onclick="scalLbGo(1)"></button>
-      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}${scalDlHtml(s, st)}${scalAttachHtml(s, st, L)}</div></div>`;
+      <div class="scal-lbft">${L.video ? '' : `<div class="scal-lbnote">${st && st.noFile ? 'No video for this story: it has copyrighted music (or shared content), so ' + SOC_NETS[s.net] + ' does not hand over the file, even for a business account. Only the picture is kept.' : (s.date < '2026-11-13' ? 'A picture only: this story went up before we started saving videos (13 Nov 2026), and ' + SOC_NETS[s.net] + ' only keeps a story for 24 hours.' : 'A picture only: this story was not saved as a video.')}</div>`}${st ? scalStatLines(st) : ''}${flow}${scalDlHtml(s, st)}${scalAttachHtml(s, st, L)}</div></div>`;
   } else {
     const p = it.p, e = scalEmbedUrl(p), c = cols[p.net];
     inner = `<div class="scal-lbframe post" style="--c:${c};--bf:${scalBadgeFg(c)}">
